@@ -20,30 +20,26 @@ hostname = mobile.baowugroup.com
 function main() {
     var body = $request.body || $response.body || "";
     
-    // 提取题目
-    var stem = body.match(/"questionStem"\s*:\s*"([^"]{5,400})"/);
+    // 提取所有题目
+    var stems = body.match(/"questionStem"\s*:\s*"([^"]{5,300})"/g) || [];
     
-    // 用更短更精确的范围提取答案
-    var ans = [];
-    var seen = {};
-    var pos = 0;
-    
-    while (ans.length < 10) {
-        // 在更小的范围内查找
-        pos = body.indexOf('"ifReply":"1"', pos);
-        if (pos === -1) break;
-        
-        // 只在 ifReply 之前50个字符内查找 optionItem
-        var sub = body.substring(Math.max(0, pos - 50), pos);
-        var m = sub.match(/"optionItem":"([^"]+)"[^"]*"optionContent"/);
-        
-        if (m && !seen[m[1]]) {
-            seen[m[1]] = true;
-            ans.push(m[1]);
-        }
-        pos = pos + 10;
+    // 提取所有答案
+    var r = /"ifReply":"1"/g;
+    var allAns = [];
+    var m;
+    while ((m = r.exec(body)) !== null) {
+        var sub = body.substring(Math.max(0, m.index - 60), m.index);
+        var k = sub.match(/"optionItem"\s*:\s*"([^"]+)"/);
+        if (k) allAns.push(k[1]);
     }
     
-    console.log((stem ? stem[1] : "") + "\n答案：" + ans.join(""));
+    // 输出
+    var out = "\n";
+    for (var i = 0; i < stems.length; i++) {
+        var stem = stems[i].match(/"questionStem"\s*:\s*"([^"]{5,300})"/);
+        var ans = allAns.slice(i * 4, i * 4 + 4).join("");
+        out += (stem ? stem[1] : "") + "\n答案：" + ans + "\n\n";
+    }
+    console.log(out);
 }
 main();
