@@ -19,21 +19,31 @@ hostname = mobile.baowugroup.com
 
 function main() {
     var body = $request.body || $response.body || "";
+    
+    // 提取题目
     var stem = body.match(/"questionStem"\s*:\s*"([^"]{5,400})"/);
+    
+    // 用更短更精确的范围提取答案
     var ans = [];
     var seen = {};
-    var idx = 0;
+    var pos = 0;
+    
     while (ans.length < 10) {
-        idx = body.indexOf('"ifReply":"1"', idx);
-        if (idx === -1) break;
-        var sub = body.substring(Math.max(0, idx - 200), idx);
-        var m = sub.match(/"optionItem":"([^"]+)"/);
+        // 在更小的范围内查找
+        pos = body.indexOf('"ifReply":"1"', pos);
+        if (pos === -1) break;
+        
+        // 只在 ifReply 之前50个字符内查找 optionItem
+        var sub = body.substring(Math.max(0, pos - 50), pos);
+        var m = sub.match(/"optionItem":"([^"]+)"[^"]*"optionContent"/);
+        
         if (m && !seen[m[1]]) {
             seen[m[1]] = true;
             ans.push(m[1]);
         }
-        idx++;
+        pos = pos + 10;
     }
+    
     console.log((stem ? stem[1] : "") + "\n答案：" + ans.join(""));
 }
 main();
