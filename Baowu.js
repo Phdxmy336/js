@@ -17,35 +17,22 @@ hostname = mobile.baowugroup.com
 */
 
 
-var body = $request.body;
-if (!body) {
-    $done({});
-} else {
-    try {
-        let obj = JSON.parse(body);
+const url = $request.url; 
+const method = $request.method;
+const headers = $request.headers;
+let body = JSON.parse($request.body);
  
-        (function modify(node) {
-            if (!node || typeof node !== 'object' || node === null) return;
-            
-            // 只修改直接子节点，不深入遍历数组元素
-            if (!Array.isArray(node)) {
-                if (node.hasOwnProperty('creditHours') && node.hasOwnProperty('totalTime')) {
-                    if (typeof node.totalTime === 'number') {
-                        node.creditHours = node.totalTime;
-                    }
-                }
-                
-                for (let key in node) {
-                    if (node.hasOwnProperty(key)) {
-                        modify(node[key]);
-                    }
-                }
-            }
-        })(obj);
- 
-        $done({ body: JSON.stringify(obj) });
-    } catch (e) {
-        console.log("错误: " + e.message);
-        $done({ body: body }); // 返回原始请求体
-    }
+// 修改逻辑示例：将 creditHours 同步为 totalTime 的值 
+if (body.hasOwnProperty("totalTime")) {
+    body.creditHours = body.totalTime; // 强制对齐学分时长 
+    console.log(`已修改 creditHours=${body.creditHours}`);
 }
+ 
+ 
+// 重新序列化并返回 
+$done({
+    url: url,
+    method: method,
+    headers: headers,
+    body: JSON.stringify(body)
+});
