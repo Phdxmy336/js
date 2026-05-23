@@ -17,80 +17,15 @@ hostname = mobile.baowugroup.com
 */
 
 
-// Quantumult X 安全考试题目提取脚本
-// 兼容新版Quantumult X语法 
- 
-var typeMap = {
-    "0": "判断题",
-    "1": "单选题",
-    "2": "多选题"
-};
- 
-function extractQuestions(body) {
-    // 提取题目类型
-    var typeMatch = body.match(/"questionsType":\s*"?(\d)"?/);
-    var questionsType = typeMatch ? typeMatch[1] : null;
-    var typeName = typeMap[questionsType] || "未知类型";
-    
-    // 提取题干
-    var stemMatch = body.match(/"questionStem":\s*"([^"]+)"/);
-    var questionStem = stemMatch ? stemMatch[1] : "未找到题干";
-    
-    // 提取选项和答案
-    var optionRegex = /"optionItem":\s*"([^"]+)"[^]*?"optionContent":\s*"([^"]+)"[^]*?"ifReply":\s*"(\d)"/g;
-    var options = [];
-    var answers = [];
-    var match;
-    
-    while ((match = optionRegex.exec(body)) !== null) {
-        var optionItem = match[1];
-        var optionContent = match[2];
-        var ifReply = match[3];
-        
-        options.push({
-            item: optionItem,
-            content: optionContent
-        });
-        
-        if (ifReply === "1") {
-            answers.push(optionItem);
-        }
-    }
-    
-    // 格式化输出
-    var output = "\n";
-    output += "══════════════════════════════════════\n";
-    output += "📝 题目提取结果\n";
-    output += "══════════════════════════════════════\n\n";
-    output += "【题目类型】" + typeName + "\n\n";
-    output += "【题干内容】\n" + questionStem + "\n\n";
-    output += "【选项列表】\n";
-    
-    for (var i = 0; i < options.length; i++) {
-        output += "   " + options[i].item + ". " + options[i].content + "\n";
-    }
-    
-    output += "\n";
-    output += "【正确答案】" + answers.join("") + "\n";
-    output += "\n══════════════════════════════════════\n";
-    
-    console.log(output);
-}
- 
-// 主函数入口
 function main() {
-    var url = $request.url;
-    var method = $request.method;
-    var headers = $request.headers;
-    var body = $request.body || $response.body;
-    
-    if (!body) {
-        console.log("❌ 未获取到数据");
-        return;
+    var body = $request.body || $response.body || "";
+    var stem = body.match(/"questionStem"\s*:\s*"([^"]{10,500})"/);
+    var ans = body.match(/"ifReply"\s*:\s*"1"[^]{0,200}?"optionItem"\s*:\s*"([A-Z])"/g) || [];
+    var keys = [];
+    for (var i = 0; i < ans.length; i++) {
+        var m = ans[i].match(/optionItem"\s*:\s*"([A-Z])"/);
+        if (m) keys.push(m[1]);
     }
-    
-    extractQuestions(body);
+    console.log((stem ? stem[1] : "") + "\n答案：" + keys.join(""));
 }
- 
-// 执行
 main();
