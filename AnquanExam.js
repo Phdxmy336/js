@@ -16,8 +16,6 @@ hostname = mobile.baowugroup.com
 *
 */
 
-
-// 保存为: exam_answer.js
  
 // 模拟的响应数据（实际使用时由QX传入）
 const responseBody = $response.body;
