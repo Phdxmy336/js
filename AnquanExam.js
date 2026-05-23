@@ -17,51 +17,87 @@ hostname = mobile.baowugroup.com
 */
 
 
-// AnquanExam.js - 精确版
+// 脚本配置
+const REGEX = /"questionsType":\s*"?([^",}]+)"?[\s\S]*?"questionStem":\s*"([^"]+)"/;
+const OPTIONS_REGEX = /"optionItem":\s*"([^"]+)"[^}]*"optionContent":\s*"([^"]+)"[^}]*"ifReply":\s*"([^"]+)"/g;
  
-const RAW = JSON.parse($response.body);
-const DATA = RAW.body || RAW;
-let OUT = ["📋 正确答案\n"];
- 
-const TYPES = {
-    "0": "判断",
-    "1": "单选",
-    "2": "多选"
-};
- 
-// 从任意数组中提取答案
-function extractFromArray(arr, type) {
-    if (!Array.isArray(arr)) return;
+// 主函数入口
+$task.fetch/task = async (task) => {
+    const { body } = task;
     
-    arr.forEach((q, i) => {
-        let answers = [];
-        let options = q.questionsOptions || [];
-        
-        options.forEach(opt => {
-            if (opt.ifReply === "1") {
-                answers.push(opt.optionContent);
-            }
-        });
-        
-        if (answers.length > 0) {
-            let typeName = TYPES[q.questionsType] || "其他";
-            let num = i + 1;
-            let stem = (q.questionStem || "").substring(0, 40);
-            OUT.push(`[${typeName}]${num}. ${stem}...`);
-            OUT.push("  → " + answers.join(" / ") + "\n");
+    try {
+        // 提取题目类型和题干
+        const mainMatch = body.match(REGEX);
+        if (!mainMatch) {
+            console.log("❌ 未找到题目数据");
+            return;
         }
-    });
+        
+        const questionsType = mainMatch[1].replace(/"/g, '').trim();
+        const questionStem = mainMatch[2].replace(/"/g, '').trim();
+        
+        // 题目类型映射
+        const typeMap = {
+            "0": "判断题",
+            "1": "单选题", 
+            "2": "多选题"
+        };
+        const typeName = typeMap[questionsType] || "未知类型";
+        
+        // 提取选项和答案
+        let options = [];
+        let answers = [];
+        let match;
+        
+        while ((match = OPTIONS_REGEX.exec(body)) !== null) {
+            const optionItem = match[1];
+            const optionContent = match[2];
+            const ifReply = match[3];
+            
+            options.push({ item: optionItem, content: optionContent });
+            
+            if (ifReply === "1") {
+                answers.push(optionItem);
+            }
+        }
+        
+        // 格式化输出
+        let output = `\n`;
+        output += `═══════════════════════════════\n`;
+        output += `         📝 题目提取结果\n`;
+        output += `═══════════════════════════════\n`;
+        output += `\n`;
+        output += `【题目类型】${typeName}\n`;
+        output += `\n`;
+        output += `【题干内容】\n${questionStem}\n`;
+        output += `\n`;
+        output += `【选项列表】\n`;
+        options.forEach(opt => {
+            output += `   ${opt.item}. ${opt.content}\n`;
+        });
+        output += `\n`;
+        output += `【正确答案】${answers.join('')}\n`;
+        output += `\n`;
+        output += `═══════════════════════════════\n`;
+        
+        console.log(output);
+        
+    } catch (error) {
+        console.log(`❌ 解析失败: ${error.message}`);
+    }
 }
  
-// 搜索所有可能的数组
-Object.keys(DATA).forEach(key => {
-    if (Array.isArray(DATA[key])) {
-        extractFromArray(DATA[key]);
+// 定时任务
+const config = {
+    name: "题目提取器",
+    cron: "*/5 * * * *",
+    url: "你的数据源URL",
+    headers: {
+        "User-Agent": "Mozilla/5.0"
     }
+};
+ 
+// 执行入口
+$task.fetch(config).then(task).catch(err => {
+    console.log(`❌ 请求失败: ${err}`);
 });
- 
-const RESULT = OUT.join("\n") || "未找到答案";
-$prefs.setValueForKey(RESULT, "EXAM_ANSWERS");
-console.log(RESULT);
- 
-$done({ body: $response.body });
