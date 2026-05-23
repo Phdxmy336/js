@@ -17,48 +17,51 @@ hostname = mobile.baowugroup.com
 */
 
 
-// AnquanExam.js - 根据实际字段名修正
+// AnquanExam.js - 精确版
  
 const RAW = JSON.parse($response.body);
-const DATA = RAW.data || {};
-const EXAM = DATA.exam || {};
+const DATA = RAW.body || RAW;
+let OUT = ["📋 正确答案\n"];
  
-let questions = [];
+const TYPES = {
+    "0": "判断",
+    "1": "单选",
+    "2": "多选"
+};
  
-// 在 exam 下查找可能的题目数组
-const possibleKeys = [
-    "questions", "questionList", "questionVos", "questionsVos",
-    "examQuestions", "examQuestionsVos", "pdexamQuestionsVos", 
-    "dxexamQuestionsVos", "ddxexamQuestionsVos"
-];
- 
-possibleKeys.forEach(key => {
-    if (EXAM[key] && Array.isArray(EXAM[key])) {
-        questions = questions.concat(EXAM[key]);
-    }
-});
- 
-// 提取答案
-let RESULT = [];
-questions.forEach((q, i) => {
-    let correctOpts = [];
+// 从任意数组中提取答案
+function extractFromArray(arr, type) {
+    if (!Array.isArray(arr)) return;
     
-    (q.questionsOptions || []).forEach(o => {
-        // ifReply 为 "1" 或 1 表示正确
-        if (o.ifReply === "1" || o.ifReply === 1) {
-            correctOpts.push(o.optionItem + ". " + o.optionContent);
+    arr.forEach((q, i) => {
+        let answers = [];
+        let options = q.questionsOptions || [];
+        
+        options.forEach(opt => {
+            if (opt.ifReply === "1") {
+                answers.push(opt.optionContent);
+            }
+        });
+        
+        if (answers.length > 0) {
+            let typeName = TYPES[q.questionsType] || "其他";
+            let num = i + 1;
+            let stem = (q.questionStem || "").substring(0, 40);
+            OUT.push(`[${typeName}]${num}. ${stem}...`);
+            OUT.push("  → " + answers.join(" / ") + "\n");
         }
     });
-    
-    if (correctOpts.length > 0) {
-        const qName = q.questionStem || ("题目" + (i + 1));
-        RESULT.push((i + 1) + ". " + qName);
-        RESULT.push("   答案: " + correctOpts.join(", "));
+}
+ 
+// 搜索所有可能的数组
+Object.keys(DATA).forEach(key => {
+    if (Array.isArray(DATA[key])) {
+        extractFromArray(DATA[key]);
     }
 });
  
-const OUTPUT = RESULT.join("\n") || "未找到答案";
-$prefs.setValueForKey(OUTPUT, "EXAM_ANSWERS");
-console.log("✅ 答案:\n" + OUTPUT);
+const RESULT = OUT.join("\n") || "未找到答案";
+$prefs.setValueForKey(RESULT, "EXAM_ANSWERS");
+console.log(RESULT);
  
 $done({ body: $response.body });
