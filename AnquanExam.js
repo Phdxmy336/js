@@ -21,16 +21,19 @@ function main() {
     var body = $request.body || $response.body || "";
     var stem = body.match(/"questionStem"\s*:\s*"([^"]{5,400})"/);
     var ans = [];
-    var idx = body.indexOf('"ifReply":"1"');
-    while (idx > 0 && ans.length < 10) {
-        var sub = body.substring(0, idx);
-        var last = sub.lastIndexOf('"optionItem":"');
-        if (last > 0) {
-            var key = body.substring(last + 14, last + 15);
-            ans.push(key);
+    var seen = {};
+    var idx = 0;
+    while (ans.length < 10) {
+        idx = body.indexOf('"ifReply":"1"', idx);
+        if (idx === -1) break;
+        var sub = body.substring(Math.max(0, idx - 200), idx);
+        var m = sub.match(/"optionItem":"([^"]+)"/);
+        if (m && !seen[m[1]]) {
+            seen[m[1]] = true;
+            ans.push(m[1]);
         }
-        idx = body.indexOf('"ifReply":"1"', idx + 1);
+        idx++;
     }
-    console.log((stem ? stem[1] : "未找到") + "\n答案：" + ans.join(""));
+    console.log((stem ? stem[1] : "") + "\n答案：" + ans.join(""));
 }
 main();
