@@ -20,38 +20,47 @@ hostname = mobile.baowugroup.com
 const url = $request.url;
 const method = $request.method;
 const headers = $request.headers;
- 
+
 if (!$request.body) {
     $done({});
-} else {
+    return;
+}
+
+try {
     let body = JSON.parse($request.body);
- 
-    // 递归处理函数（支持深层嵌套结构）
-    (function deepModify(obj) {
+
+    // 递归处理函数
+    function deepModify(obj) {
         if (!obj || typeof obj !== 'object') return;
- 
-        // 修改逻辑：当同时存在 totalTime 和 creditHours 时进行同步
+
+        // 同步字段逻辑
         if (obj.hasOwnProperty('totalTime') && obj.hasOwnProperty('creditHours')) {
-            if (typeof obj.totalTime === 'number') {
+            if (typeof obj.totalTime === 'number' && obj.totalTime >= 0) {
                 obj.creditHours = obj.totalTime;
-                console.log(`同步字段: creditHours=${obj.creditHours}`);
             }
         }
- 
-        // 遍历所有属性（包括数组和嵌套对象）
-        Object.keys(obj).forEach(key => {
-            if (Array.isArray(obj[key])) {
-                obj[key].forEach(item => deepModify(item));
-            } else if (typeof obj[key] === 'object') {
-                deepModify(obj[key]);
+
+        // 遍历所有属性
+        for (const key of Object.keys(obj)) {
+            const value = obj[key];
+            if (Array.isArray(value)) {
+                value.forEach(item => deepModify(item));
+            } else if (typeof value === 'object' && value !== null) {
+                deepModify(value);
             }
-        });
-    })(body);
- 
+        }
+    }
+
+    deepModify(body);
+
     $done({
         url: url,
         method: method,
         headers: headers,
         body: JSON.stringify(body)
     });
+
+} catch (error) {
+    console.error('JSON 解析错误:', error);
+    $done({});
 }
