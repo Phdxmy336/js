@@ -18,28 +18,17 @@ hostname = mobile.baowugroup.com
 
 
 function main() {
-    var body = $request.body || $response.body || "";
-    
-    // 提取所有题目
-    var stems = body.match(/"questionStem"\s*:\s*"([^"]{5,300})"/g) || [];
-    
-    // 提取所有答案
+    var b = $request.body || $response.body || "";
+    var s = b.match(/"questionStem"\s*:\s*"([^"]{5,150})"/g) || [];
     var r = /"ifReply":"1"/g;
-    var allAns = [];
+    var a = [];
     var m;
-    while ((m = r.exec(body)) !== null) {
-        var sub = body.substring(Math.max(0, m.index - 60), m.index);
+    while ((m = r.exec(b)) !== null && a.length < 10) {
+        var sub = b.substring(Math.max(0, m.index - 50), m.index);
         var k = sub.match(/"optionItem"\s*:\s*"([^"]+)"/);
-        if (k) allAns.push(k[1]);
+        if (k && a.indexOf(k[1]) < 0) a.push(k[1]);
     }
-    
-    // 输出
-    var out = "\n";
-    for (var i = 0; i < stems.length; i++) {
-        var stem = stems[i].match(/"questionStem"\s*:\s*"([^"]{5,300})"/);
-        var ans = allAns.slice(i * 4, i * 4 + 4).join("");
-        out += (stem ? stem[1] : "") + "\n答案：" + ans + "\n\n";
-    }
-    console.log(out);
+    var t = s.length > 1 ? "📝 共" + s.length + "题" : "📝 " + s[0].substring(0, 50);
+    $notification.post(t, "答案：" + a.join(""), "点击查看完整题目");
 }
 main();
