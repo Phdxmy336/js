@@ -1,26 +1,46 @@
-// 创建一个代理函数来修改请求体
-function createModifiedRequestBody(originalBody) {
-  // 深拷贝原始对象
-  const modifiedBody = JSON.parse(JSON.stringify(originalBody));
-  
-  // 将 creditHours 修改为 totalTime 的值
-  if (modifiedBody.hasOwnProperty('totalTime') && modifiedBody.hasOwnProperty('creditHours')) {
-    modifiedBody.creditHours = modifiedBody.totalTime;
-  }
-  
-  return modifiedBody;
+/*
+ *
+ *
+脚本功能：宝武安全E家在线学习秒刷
+脚本作者：Phdxmy
+更新时间：2026年
+使用声明：此脚本仅供学习与交流，请在下载使用24小时内删除！请勿在中国大陆转载与贩卖！
+*******************************
+[rewrite_local]
+# >安全E家秒刷
+^https:\/\/mobile\.baowugroup\.com\/com\.baosight\.wisdomsecurity\/service\/bggfab-px\/mobileapi\/onLineStudy\/finshStudy url script-request-body https://raw.githubusercontent.com/Phdxmy336/js/main/request-body.js
+
+[mitm]
+hostname = mobile.baowugroup.com
+*
+*
+*/
+
+
+
+var body = $request.body;
+if (!body) {
+    $done({});
+} else {
+    let obj = JSON.parse(body);
+ 
+    // 递归修改函数
+    (function modify(node) {
+        if (!node || typeof node !== 'object') return;
+        
+        // 找到包含 creditHours 和 totalTime 的对象
+        if (node.hasOwnProperty('creditHours') && node.hasOwnProperty('totalTime')) {
+            // 将 creditHours 替换为 totalTime 的值
+            if (typeof node.totalTime === 'number' && node.totalTime >= 0) {
+                node.creditHours = node.totalTime;
+            }
+        }
+        
+        // 递归遍历所有属性
+        for (let key in node) {
+            modify(node[key]);
+        }
+    })(obj);
+ 
+    $done({ body: JSON.stringify(obj) });
 }
-
-// 使用方式：
-const requestBody = {
-  "userName": "xxx",
-  "courseHour": 5,
-  "creditHours": 21,
-  "educationTrainingDtlId": "2026052206034525186016",
-  "userCode": "68xxxx",
-  "safetyStudyMstId": "20260521144141366757760",
-  "totalTime": 300
-};
-
-// 修改后的请求体
-const modifiedBody = createModifiedRequestBody(requestBody);
