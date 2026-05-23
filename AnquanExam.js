@@ -16,69 +16,36 @@ hostname = mobile.baowugroup.com
 *
 */
 
+
+
+// Quantumult X 考试答案提取脚本
  
-// AnquanExam.js - 修复版（兼容所有QX版本）
+const BODY = JSON.parse($response.body);
+const DATA = BODY.body || BODY;
+let OUTPUT = [];
  
-const $tool = {
-    read: (key) => $prefs.valueForKey(key),
-    write: (val, key) => $prefs.setValueForKey(val, key)
-};
+const TYPES = [
+    { key: "pdexamQuestionsVos", name: "判断题" },
+    { key: "dxexamQuestionsVos", name: "选择题" },
+    { key: "ddxexamQuestionsVos", name: "多选题" }
+];
  
-const KEY = "exam_answers_" + Date.now();
- 
-function extractAnswers(data) {
-    let results = [];
+TYPES.forEach(t => {
+    const list = DATA[t.key];
+    if (!list || !Array.isArray(list)) return;
     
-    function processList(list, type) {
-        if (!list || list.length === 0) return;
-        
-        results.push(`\n【${type}】\n`);
-        
-        list.forEach((q, i) => {
-            let opts = [];
-            (q.questionsOptions || []).forEach(o => {
-                if (o.ifReply === "1") {
-                    opts.push(o.optionContent);
-                }
-            });
-            if (opts.length > 0) {
-                results.push(`${i + 1}. ${opts.join(" / ")}\n`);
-            }
+    OUTPUT.push("【" + t.name + "】");
+    
+    list.forEach((q, idx) => {
+        let ans = [];
+        (q.questionsOptions || []).forEach(o => {
+            if (o.ifReply === "1") ans.push(o.optionContent);
         });
-    }
-    
-    const body = data.body || data;
-    
-    // 处理各种题型
-    processList(body.dxexamQuestionsVos, "选择题");
-    processList(body.ddxexamQuestionsVos, "多选题");
-    processList(body.pdexamQuestionsVos, "判断题");
-    processList(body.examQuestionsVos, "简答题");
-    
-    return results.length > 0 ? results.join("") : "未找到答案";
-}
- 
-// 主程序
-try {
-    const data = JSON.parse($response.body);
-    const answers = extractAnswers(data);
-    
-    // 写入剪贴板
-    $clipboard.write({
-        string: answers
+        if (ans.length) OUTPUT.push((idx + 1) + ". " + ans.join(" / "));
     });
-    
-    // 兼容的通知方式
-    if (typeof $notify !== "undefined") {
-        $notify("✅ 答案已复制", "", "正确答案已保存到剪贴板");
-    } else if (typeof $notification !== "undefined") {
-        $notification.post("✅ 答案已复制", "", "正确答案已保存到剪贴板");
-    }
-    
-    console.log("答案内容:\n" + answers);
-    
-} catch (e) {
-    console.error("脚本错误: " + e.message);
-}
+});
  
+const RESULT = OUTPUT.join("\n") || "无答案";
+$clipboard.write({ string: RESULT });
+console.log(RESULT);
 $done({ body: $response.body });
