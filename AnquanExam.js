@@ -19,13 +19,18 @@ hostname = mobile.baowugroup.com
 
 function main() {
     var body = $request.body || $response.body || "";
-    var stem = body.match(/"questionStem"\s*:\s*"([^"]{10,500})"/);
-    var ans = body.match(/"ifReply"\s*:\s*"1"[^]{0,200}?"optionItem"\s*:\s*"([A-Z])"/g) || [];
-    var keys = [];
-    for (var i = 0; i < ans.length; i++) {
-        var m = ans[i].match(/optionItem"\s*:\s*"([A-Z])"/);
-        if (m) keys.push(m[1]);
+    var stem = body.match(/"questionStem"\s*:\s*"([^"]{5,400})"/);
+    var ans = [];
+    var idx = body.indexOf('"ifReply":"1"');
+    while (idx > 0 && ans.length < 10) {
+        var sub = body.substring(0, idx);
+        var last = sub.lastIndexOf('"optionItem":"');
+        if (last > 0) {
+            var key = body.substring(last + 14, last + 15);
+            ans.push(key);
+        }
+        idx = body.indexOf('"ifReply":"1"', idx + 1);
     }
-    console.log((stem ? stem[1] : "") + "\n答案：" + keys.join(""));
+    console.log((stem ? stem[1] : "未找到") + "\n答案：" + ans.join(""));
 }
 main();
