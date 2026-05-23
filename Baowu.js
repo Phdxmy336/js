@@ -11,7 +11,7 @@
 ^https:\/\/mobile\.baowugroup\.com\/com\.baosight\.wisdomsecurity\/service\/bggfab-px\/mobileapi\/onLineStudy\/finshStudy url script-request-body https://raw.githubusercontent.com/Phdxmy336/js/main/Baowu.js
 
 [mitm]
-hostname = mobile.baowugroup.com
+hostname = *.baowugroup.com
 *
 *
 */
