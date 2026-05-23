@@ -17,22 +17,41 @@ hostname = mobile.baowugroup.com
 */
 
 
-const url = $request.url; 
+const url = $request.url;
 const method = $request.method;
 const headers = $request.headers;
-let body = JSON.parse($request.body);
  
-// 修改逻辑示例：将 creditHours 同步为 totalTime 的值 
-if (body.hasOwnProperty("totalTime")) {
-    body.creditHours = body.totalTime; // 强制对齐学分时长 
-    console.log(`已修改 creditHours=${body.creditHours}`);
+if (!$request.body) {
+    $done({});
+} else {
+    let body = JSON.parse($request.body);
+ 
+    // 递归处理函数（支持深层嵌套结构）
+    (function deepModify(obj) {
+        if (!obj || typeof obj !== 'object') return;
+ 
+        // 修改逻辑：当同时存在 totalTime 和 creditHours 时进行同步
+        if (obj.hasOwnProperty('totalTime') && obj.hasOwnProperty('creditHours')) {
+            if (typeof obj.totalTime === 'number') {
+                obj.creditHours = obj.totalTime;
+                console.log(`同步字段: creditHours=${obj.creditHours}`);
+            }
+        }
+ 
+        // 遍历所有属性（包括数组和嵌套对象）
+        Object.keys(obj).forEach(key => {
+            if (Array.isArray(obj[key])) {
+                obj[key].forEach(item => deepModify(item));
+            } else if (typeof obj[key] === 'object') {
+                deepModify(obj[key]);
+            }
+        });
+    })(body);
+ 
+    $done({
+        url: url,
+        method: method,
+        headers: headers,
+        body: JSON.stringify(body)
+    });
 }
- 
- 
-// 重新序列化并返回 
-$done({
-    url: url,
-    method: method,
-    headers: headers,
-    body: JSON.stringify(body)
-});
