@@ -17,15 +17,6 @@ hostname = mobile.baowugroup.com
 */
 
 
-(function() {
-    var bodyString = $request.body;
-    if (!bodyString) return;
-    
-    var body = JSON.parse(bodyString);
-    
-    if (body.totalTime != null && body.creditHours != null) {
-        body.creditHours = body.totalTime;
-    }
-    
-    $done({ body: JSON.stringify(body) });
-})();
+let obj = JSON.parse($request.body);
+obj.creditHours = obj.totalTime;
+$done({body: JSON.stringify(obj)});
