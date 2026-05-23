@@ -17,29 +17,35 @@ hostname = mobile.baowugroup.com
 */
 
 
-
 var body = $request.body;
 if (!body) {
     $done({});
 } else {
-    let obj = JSON.parse(body);
+    try {
+        let obj = JSON.parse(body);
  
-    // 递归修改函数
-    (function modify(node) {
-        if (!node || typeof node !== 'object') return;
-        
-        // 找到包含 creditHours 和 totalTime 的对象
-        if (node.hasOwnProperty('creditHours') && node.hasOwnProperty('totalTime')) {
-            if (typeof node.totalTime === 'number' && node.totalTime >= 0) {
-                node.creditHours = node.totalTime;
+        (function modify(node) {
+            if (!node || typeof node !== 'object' || node === null) return;
+            
+            // 只修改直接子节点，不深入遍历数组元素
+            if (!Array.isArray(node)) {
+                if (node.hasOwnProperty('creditHours') && node.hasOwnProperty('totalTime')) {
+                    if (typeof node.totalTime === 'number') {
+                        node.creditHours = node.totalTime;
+                    }
+                }
+                
+                for (let key in node) {
+                    if (node.hasOwnProperty(key)) {
+                        modify(node[key]);
+                    }
+                }
             }
-        }
-        
-        // 递归遍历所有属性
-        for (let key in node) {
-            modify(node[key]);
-        }
-    })(obj);
+        })(obj);
  
-    $done({ body: JSON.stringify(obj) });
+        $done({ body: JSON.stringify(obj) });
+    } catch (e) {
+        console.log("错误: " + e.message);
+        $done({ body: body }); // 返回原始请求体
+    }
 }
