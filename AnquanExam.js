@@ -17,87 +17,80 @@ hostname = mobile.baowugroup.com
 */
 
 
-// 脚本配置
-const REGEX = /"questionsType":\s*"?([^",}]+)"?[\s\S]*?"questionStem":\s*"([^"]+)"/;
-const OPTIONS_REGEX = /"optionItem":\s*"([^"]+)"[^}]*"optionContent":\s*"([^"]+)"[^}]*"ifReply":\s*"([^"]+)"/g;
+// Quantumult X 安全考试题目提取脚本
+// 兼容新版Quantumult X语法 
  
-// 主函数入口
-$task.fetch/task = async (task) => {
-    const { body } = task;
-    
-    try {
-        // 提取题目类型和题干
-        const mainMatch = body.match(REGEX);
-        if (!mainMatch) {
-            console.log("❌ 未找到题目数据");
-            return;
-        }
-        
-        const questionsType = mainMatch[1].replace(/"/g, '').trim();
-        const questionStem = mainMatch[2].replace(/"/g, '').trim();
-        
-        // 题目类型映射
-        const typeMap = {
-            "0": "判断题",
-            "1": "单选题", 
-            "2": "多选题"
-        };
-        const typeName = typeMap[questionsType] || "未知类型";
-        
-        // 提取选项和答案
-        let options = [];
-        let answers = [];
-        let match;
-        
-        while ((match = OPTIONS_REGEX.exec(body)) !== null) {
-            const optionItem = match[1];
-            const optionContent = match[2];
-            const ifReply = match[3];
-            
-            options.push({ item: optionItem, content: optionContent });
-            
-            if (ifReply === "1") {
-                answers.push(optionItem);
-            }
-        }
-        
-        // 格式化输出
-        let output = `\n`;
-        output += `═══════════════════════════════\n`;
-        output += `         📝 题目提取结果\n`;
-        output += `═══════════════════════════════\n`;
-        output += `\n`;
-        output += `【题目类型】${typeName}\n`;
-        output += `\n`;
-        output += `【题干内容】\n${questionStem}\n`;
-        output += `\n`;
-        output += `【选项列表】\n`;
-        options.forEach(opt => {
-            output += `   ${opt.item}. ${opt.content}\n`;
-        });
-        output += `\n`;
-        output += `【正确答案】${answers.join('')}\n`;
-        output += `\n`;
-        output += `═══════════════════════════════\n`;
-        
-        console.log(output);
-        
-    } catch (error) {
-        console.log(`❌ 解析失败: ${error.message}`);
-    }
-}
- 
-// 定时任务
-const config = {
-    name: "题目提取器",
-    cron: "*/5 * * * *",
-    url: "你的数据源URL",
-    headers: {
-        "User-Agent": "Mozilla/5.0"
-    }
+var typeMap = {
+    "0": "判断题",
+    "1": "单选题",
+    "2": "多选题"
 };
  
-// 执行入口
-$task.fetch(config).then(task).catch(err => {
-    console.log(`❌ 请求失败: ${err}`);
-});
+function extractQuestions(body) {
+    // 提取题目类型
+    var typeMatch = body.match(/"questionsType":\s*"?(\d)"?/);
+    var questionsType = typeMatch ? typeMatch[1] : null;
+    var typeName = typeMap[questionsType] || "未知类型";
+    
+    // 提取题干
+    var stemMatch = body.match(/"questionStem":\s*"([^"]+)"/);
+    var questionStem = stemMatch ? stemMatch[1] : "未找到题干";
+    
+    // 提取选项和答案
+    var optionRegex = /"optionItem":\s*"([^"]+)"[^]*?"optionContent":\s*"([^"]+)"[^]*?"ifReply":\s*"(\d)"/g;
+    var options = [];
+    var answers = [];
+    var match;
+    
+    while ((match = optionRegex.exec(body)) !== null) {
+        var optionItem = match[1];
+        var optionContent = match[2];
+        var ifReply = match[3];
+        
+        options.push({
+            item: optionItem,
+            content: optionContent
+        });
+        
+        if (ifReply === "1") {
+            answers.push(optionItem);
+        }
+    }
+    
+    // 格式化输出
+    var output = "\n";
+    output += "══════════════════════════════════════\n";
+    output += "📝 题目提取结果\n";
+    output += "══════════════════════════════════════\n\n";
+    output += "【题目类型】" + typeName + "\n\n";
+    output += "【题干内容】\n" + questionStem + "\n\n";
+    output += "【选项列表】\n";
+    
+    for (var i = 0; i < options.length; i++) {
+        output += "   " + options[i].item + ". " + options[i].content + "\n";
+    }
+    
+    output += "\n";
+    output += "【正确答案】" + answers.join("") + "\n";
+    output += "\n══════════════════════════════════════\n";
+    
+    console.log(output);
+}
+ 
+// 主函数入口
+function main() {
+    var url = $request.url;
+    var method = $request.method;
+    var headers = $request.headers;
+    var body = $request.body || $response.body;
+    
+    if (!body) {
+        console.log("❌ 未获取到数据");
+        return;
+    }
+    
+    extractQuestions(body);
+}
+ 
+// 执行
+main();
