@@ -30,7 +30,6 @@ if (!body) {
         
         // 找到包含 creditHours 和 totalTime 的对象
         if (node.hasOwnProperty('creditHours') && node.hasOwnProperty('totalTime')) {
-            // 将 creditHours 替换为 totalTime 的值
             if (typeof node.totalTime === 'number' && node.totalTime >= 0) {
                 node.creditHours = node.totalTime;
             }
