@@ -17,111 +17,68 @@ hostname = mobile.baowugroup.com
 */
 
  
-// 模拟的响应数据（实际使用时由QX传入）
-const responseBody = $response.body;
-const data = JSON.parse(responseBody);
+// AnquanExam.js - 修复版（兼容所有QX版本）
  
-// 用于存储所有正确答案
-let answers = [];
+const $tool = {
+    read: (key) => $prefs.valueForKey(key),
+    write: (val, key) => $prefs.setValueForKey(val, key)
+};
  
-// ==================== 处理单选题/多选题 ====================
-function processQuestions(questions, typeName) {
-    if (!questions || questions.length === 0) return;
+const KEY = "exam_answers_" + Date.now();
+ 
+function extractAnswers(data) {
+    let results = [];
     
-    let section = `\n【${typeName}】\n`;
-    let hasAnswer = false;
-    
-    questions.forEach((q, qIndex) => {
-        const questionText = q.questionStem || `题目${qIndex + 1}`;
-        let correctOptions = [];
+    function processList(list, type) {
+        if (!list || list.length === 0) return;
         
-        if (q.questionsOptions && q.questionsOptions.length > 0) {
-            q.questionsOptions.forEach(opt => {
-                if (opt.ifReply === "1") {
-                    correctOptions.push(`${opt.optionItem}. ${opt.optionContent}`);
+        results.push(`\n【${type}】\n`);
+        
+        list.forEach((q, i) => {
+            let opts = [];
+            (q.questionsOptions || []).forEach(o => {
+                if (o.ifReply === "1") {
+                    opts.push(o.optionContent);
                 }
             });
-        }
-        
-        if (correctOptions.length > 0) {
-            hasAnswer = true;
-            section += `${qIndex + 1}. ${questionText}\n`;
-            section += `   ✅ 正确答案: ${correctOptions.join(", ")}\n\n`;
-        }
-    });
-    
-    if (hasAnswer) {
-        answers.push(section);
+            if (opts.length > 0) {
+                results.push(`${i + 1}. ${opts.join(" / ")}\n`);
+            }
+        });
     }
+    
+    const body = data.body || data;
+    
+    // 处理各种题型
+    processList(body.dxexamQuestionsVos, "选择题");
+    processList(body.ddxexamQuestionsVos, "多选题");
+    processList(body.pdexamQuestionsVos, "判断题");
+    processList(body.examQuestionsVos, "简答题");
+    
+    return results.length > 0 ? results.join("") : "未找到答案";
 }
  
-// ==================== 处理判断题 ====================
-function processJudgeQuestions(questions, typeName) {
-    if (!questions || questions.length === 0) return;
-    
-    let section = `\n【${typeName}】\n`;
-    let hasAnswer = false;
-    
-    questions.forEach((q, qIndex) => {
-        const questionText = q.questionStem || `题目${qIndex + 1}`;
-        let correctAnswer = "错误";
-        
-        if (q.questionsOptions && q.questionsOptions.length > 0) {
-            q.questionsOptions.forEach(opt => {
-                if (opt.ifReply === "1") {
-                    correctAnswer = opt.optionContent;
-                }
-            });
-        }
-        
-        hasAnswer = true;
-        section += `${qIndex + 1}. ${questionText}\n`;
-        section += `   ✅ ${correctAnswer}\n\n`;
-    });
-    
-    if (hasAnswer) {
-        answers.push(section);
-    }
-}
- 
-// ==================== 执行处理 ====================
+// 主程序
 try {
-    // 处理各种类型的题目
-    if (data.body) {
-        const body = data.body;
-        
-        // 判断题 (pdexamQuestionsVos)
-        if (body.pdexamQuestionsVos) {
-            processJudgeQuestions(body.pdexamQuestionsVos, "判断题");
-        }
-        
-        // 选择题 (dxexamQuestionsVos)
-        if (body.dxexamQuestionsVos) {
-            processQuestions(body.dxexamQuestionsVos, "选择题");
-        }
-        
-        // 多选题 (ddxexamQuestionsVos) - 如果有的话
-        if (body.ddxexamQuestionsVos) {
-            processQuestions(body.ddxexamQuestionsVos, "多选题");
-        }
-    }
-    
-    // 格式化最终答案
-    const finalAnswer = answers.length > 0 
-        ? `📝 正确答案汇总\n${"─".repeat(30)}\n${answers.join("\n")}`
-        : "未找到正确答案";
+    const data = JSON.parse($response.body);
+    const answers = extractAnswers(data);
     
     // 写入剪贴板
     $clipboard.write({
-        string: finalAnswer
+        string: answers
     });
     
-    // 显示通知
-    $notification.post("✅ 答案已复制", "正确答案已自动复制到剪贴板", finalAnswer);
- 
+    // 兼容的通知方式
+    if (typeof $notify !== "undefined") {
+        $notify("✅ 答案已复制", "", "正确答案已保存到剪贴板");
+    } else if (typeof $notification !== "undefined") {
+        $notification.post("✅ 答案已复制", "", "正确答案已保存到剪贴板");
+    }
+    
+    console.log("答案内容:\n" + answers);
+    
 } catch (e) {
-    $notification.post("❌ 脚本执行错误", "", e.message);
+    console.error("脚本错误: " + e.message);
 }
  
-// 最终输出（用于QX日志）
-$done({ body: responseBody });
+$done({ body: $response.body });
