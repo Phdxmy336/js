@@ -17,35 +17,58 @@ hostname = mobile.baowugroup.com
 */
 
 
-
-// Quantumult X 考试答案提取脚本
+// AnquanExam.js - QX专用版 
  
-const BODY = JSON.parse($response.body);
-const DATA = BODY.body || BODY;
-let OUTPUT = [];
+const KEY = "EXAM_ANSWERS";
  
-const TYPES = [
-    { key: "pdexamQuestionsVos", name: "判断题" },
-    { key: "dxexamQuestionsVos", name: "选择题" },
-    { key: "ddxexamQuestionsVos", name: "多选题" }
-];
- 
-TYPES.forEach(t => {
-    const list = DATA[t.key];
-    if (!list || !Array.isArray(list)) return;
+function extractAnswers(data) {
+    let results = [];
     
-    OUTPUT.push("【" + t.name + "】");
-    
-    list.forEach((q, idx) => {
-        let ans = [];
-        (q.questionsOptions || []).forEach(o => {
-            if (o.ifReply === "1") ans.push(o.optionContent);
+    function processList(list, type) {
+        if (!list || list.length === 0) return;
+        
+        results.push("\n【" + type + "】");
+        
+        list.forEach((q, i) => {
+            let opts = [];
+            (q.questionsOptions || []).forEach(o => {
+                if (o.ifReply === "1") {
+                    opts.push(o.optionContent);
+                }
+            });
+            if (opts.length > 0) {
+                results.push((i + 1) + ". " + opts.join(" / "));
+            }
         });
-        if (ans.length) OUTPUT.push((idx + 1) + ". " + ans.join(" / "));
-    });
-});
+    }
+    
+    const body = data.body || data;
+    
+    processList(body.pdexamQuestionsVos, "判断题");
+    processList(body.dxexamQuestionsVos, "选择题");
+    processList(body.ddxexamQuestionsVos, "多选题");
+    
+    return results.length > 0 ? results.join("\n") : "未找到答案";
+}
  
-const RESULT = OUTPUT.join("\n") || "无答案";
-$clipboard.write({ string: RESULT });
-console.log(RESULT);
+// 主程序 
+try {
+    const data = JSON.parse($response.body);
+    const answers = extractAnswers(data);
+    
+    // 使用 $prefs 保存到本地 
+    $prefs.setValueForKey(answers, KEY);
+    
+    console.log("✅ 答案已保存: \n" + answers);
+    
+    // 可选：弹出提示 
+    let synceyBody = JSON.parse($response.body || "{}");
+    if (synceyBody.tpxksReply) {
+        console.log("答题人: " + synceyBody.tpxksReply.empName);
+    }
+    
+} catch (e) {
+    console.log("❌ 脚本错误: " + e.message);
+}
+ 
 $done({ body: $response.body });
