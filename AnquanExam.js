@@ -17,28 +17,48 @@ hostname = mobile.baowugroup.com
 */
 
 
-// 完整调试版 - 查看 data 下的所有字段
+// AnquanExam.js - 根据实际字段名修正
  
 const RAW = JSON.parse($response.body);
-const DATA = RAW.data || RAW;
+const DATA = RAW.data || {};
+const EXAM = DATA.exam || {};
  
-console.log("========== data 下所有keys ==========");
-console.log(Object.keys(DATA).join("\n"));
+let questions = [];
  
-// 检查每个字段是否是数组
-Object.keys(DATA).forEach(key => {
-    const val = DATA[key];
-    if (Array.isArray(val)) {
-        console.log("\n" + key + " 是数组，长度: " + val.length);
-        if (val.length > 0) {
-            console.log("  第一条数据的keys: " + Object.keys(val[0]).join(", "));
-        }
-    } else if (typeof val === "object" && val !== null) {
-        console.log(key + " 是对象，有 " + Object.keys(val).length + " 个属性");
+// 在 exam 下查找可能的题目数组
+const possibleKeys = [
+    "questions", "questionList", "questionVos", "questionsVos",
+    "examQuestions", "examQuestionsVos", "pdexamQuestionsVos", 
+    "dxexamQuestionsVos", "ddxexamQuestionsVos"
+];
+ 
+possibleKeys.forEach(key => {
+    if (EXAM[key] && Array.isArray(EXAM[key])) {
+        questions = questions.concat(EXAM[key]);
     }
 });
  
-console.log("\n========== 完整JSON(前2000字符) ==========");
-console.log(JSON.stringify(RAW).substring(0, 2000));
+// 提取答案
+let RESULT = [];
+questions.forEach((q, i) => {
+    let correctOpts = [];
+    
+    (q.questionsOptions || []).forEach(o => {
+        // ifReply 为 "1" 或 1 表示正确
+        if (o.ifReply === "1" || o.ifReply === 1) {
+            correctOpts.push(o.optionItem + ". " + o.optionContent);
+        }
+    });
+    
+    if (correctOpts.length > 0) {
+        const qName = q.questionStem || ("题目" + (i + 1));
+        RESULT.push((i + 1) + ". " + qName);
+        RESULT.push("   答案: " + correctOpts.join(", "));
+    }
+});
+ 
+const OUTPUT = RESULT.join("\n") || "未找到答案";
+$prefs.setValueForKey(OUTPUT, "EXAM_ANSWERS");
+console.log("✅ 答案:\n" + OUTPUT);
  
 $done({ body: $response.body });
