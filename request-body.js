@@ -1,27 +1,6 @@
-async function onRequest(context, request) {
-  // 修改请求体：将 creditHours 替换为 totalTime
-  if (request.body) {
-    try {
-      let body = request.body;
-      
-      // 如果 body 是字符串，解析为对象
-      if (typeof body === 'string') {
-        body = JSON.parse(body);
-      }
-      
-      // 替换 creditHours 为 totalTime
-      if (body && typeof body.totalTime === 'number') {
-        body.creditHours = body.totalTime;
-      }
-      
-      // 重新赋值修改后的 body
-      request.body = JSON.stringify(body);
-      
-      console.log("请求体已修改:", request.body);
-    } catch (e) {
-      console.log("处理请求体时出错:", e);
-    }
-  }
-  
-  return request;
+function syncCreditHoursToTotalTime(requestBody) {
+  return {
+    ...requestBody,
+    creditHours: requestBody.totalTime
+  };
 }
