@@ -8,7 +8,7 @@
 *******************************
 [rewrite_local]
 # >安全E家答题
-^https:\/\/mobile\.baowugroup\.com\/com\.baosight\.wisdomsecurity\/service\/bggfab-px\/mobileapi\/startExam  url script-response-body https://raw.githubusercontent.com/Phdxmy336/js/main/AnquanExam.js
+^https:\/\/mobile\.baowugroup\.com\/com\.baosight\.wisdomsecurity\/service\/bggfab-px\/mobileapi\/startExam url script-response-body https://raw.githubusercontent.com/Phdxmy336/js/main/AnquanExam.js
 
 [mitm]
 hostname = mobile.baowugroup.com
