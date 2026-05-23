@@ -17,58 +17,31 @@ hostname = mobile.baowugroup.com
 */
 
 
-// AnquanExam.js - QX专用版 
+// 调试版 - 查看完整返回数据
  
-const KEY = "EXAM_ANSWERS";
+const DATA = JSON.parse($response.body);
  
-function extractAnswers(data) {
-    let results = [];
+console.log("========== 数据结构 ==========");
+console.log("顶层keys: " + Object.keys(DATA).join(", "));
+ 
+// 检查 body 字段
+if (DATA.body) {
+    console.log("\nbody.keys: " + Object.keys(DATA.body).join(", "));
     
-    function processList(list, type) {
-        if (!list || list.length === 0) return;
-        
-        results.push("\n【" + type + "】");
-        
-        list.forEach((q, i) => {
-            let opts = [];
-            (q.questionsOptions || []).forEach(o => {
-                if (o.ifReply === "1") {
-                    opts.push(o.optionContent);
-                }
-            });
-            if (opts.length > 0) {
-                results.push((i + 1) + ". " + opts.join(" / "));
-            }
-        });
-    }
-    
-    const body = data.body || data;
-    
-    processList(body.pdexamQuestionsVos, "判断题");
-    processList(body.dxexamQuestionsVos, "选择题");
-    processList(body.ddxexamQuestionsVos, "多选题");
-    
-    return results.length > 0 ? results.join("\n") : "未找到答案";
+    // 检查各题型数据
+    ["pdexamQuestionsVos", "dxexamQuestionsVos", "ddxexamQuestionsVos"].forEach(key => {
+        const val = DATA.body[key];
+        console.log(key + ": " + (val ? val.length + "条" : "无数据"));
+    });
+} else {
+    console.log("\n无body字段，直接解析顶层");
+    ["pdexamQuestionsVos", "dxexamQuestionsVos", "ddxexamQuestionsVos"].forEach(key => {
+        const val = DATA[key];
+        console.log(key + ": " + (val ? val.length + "条" : "无数据"));
+    });
 }
  
-// 主程序 
-try {
-    const data = JSON.parse($response.body);
-    const answers = extractAnswers(data);
-    
-    // 使用 $prefs 保存到本地 
-    $prefs.setValueForKey(answers, KEY);
-    
-    console.log("✅ 答案已保存: \n" + answers);
-    
-    // 可选：弹出提示 
-    let synceyBody = JSON.parse($response.body || "{}");
-    if (synceyBody.tpxksReply) {
-        console.log("答题人: " + synceyBody.tpxksReply.empName);
-    }
-    
-} catch (e) {
-    console.log("❌ 脚本错误: " + e.message);
-}
+console.log("\n========== 前1000字符 ==========");
+console.log($response.body.substring(0, 1000));
  
 $done({ body: $response.body });
