@@ -17,50 +17,15 @@ hostname = mobile.baowugroup.com
 */
 
 
-const url = $request.url;
-const method = $request.method;
-const headers = $request.headers;
-
-if (!$request.body) {
-    $done({});
-    return;
-}
-
-try {
-    let body = JSON.parse($request.body);
-
-    // 递归处理函数
-    function deepModify(obj) {
-        if (!obj || typeof obj !== 'object') return;
-
-        // 同步字段逻辑
-        if (obj.hasOwnProperty('totalTime') && obj.hasOwnProperty('creditHours')) {
-            if (typeof obj.totalTime === 'number' && obj.totalTime >= 0) {
-                obj.creditHours = obj.totalTime;
-            }
-        }
-
-        // 遍历所有属性
-        for (const key of Object.keys(obj)) {
-            const value = obj[key];
-            if (Array.isArray(value)) {
-                value.forEach(item => deepModify(item));
-            } else if (typeof value === 'object' && value !== null) {
-                deepModify(value);
-            }
-        }
+(function() {
+    var bodyString = $request.body;
+    if (!bodyString) return;
+    
+    var body = JSON.parse(bodyString);
+    
+    if (body.totalTime != null && body.creditHours != null) {
+        body.creditHours = body.totalTime;
     }
-
-    deepModify(body);
-
-    $done({
-        url: url,
-        method: method,
-        headers: headers,
-        body: JSON.stringify(body)
-    });
-
-} catch (error) {
-    console.error('JSON 解析错误:', error);
-    $done({});
-}
+    
+    $done({ body: JSON.stringify(body) });
+})();
