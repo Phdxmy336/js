@@ -17,31 +17,28 @@ hostname = mobile.baowugroup.com
 */
 
 
-// 调试版 - 查看完整返回数据
+// 完整调试版 - 查看 data 下的所有字段
  
-const DATA = JSON.parse($response.body);
+const RAW = JSON.parse($response.body);
+const DATA = RAW.data || RAW;
  
-console.log("========== 数据结构 ==========");
-console.log("顶层keys: " + Object.keys(DATA).join(", "));
+console.log("========== data 下所有keys ==========");
+console.log(Object.keys(DATA).join("\n"));
  
-// 检查 body 字段
-if (DATA.body) {
-    console.log("\nbody.keys: " + Object.keys(DATA.body).join(", "));
-    
-    // 检查各题型数据
-    ["pdexamQuestionsVos", "dxexamQuestionsVos", "ddxexamQuestionsVos"].forEach(key => {
-        const val = DATA.body[key];
-        console.log(key + ": " + (val ? val.length + "条" : "无数据"));
-    });
-} else {
-    console.log("\n无body字段，直接解析顶层");
-    ["pdexamQuestionsVos", "dxexamQuestionsVos", "ddxexamQuestionsVos"].forEach(key => {
-        const val = DATA[key];
-        console.log(key + ": " + (val ? val.length + "条" : "无数据"));
-    });
-}
+// 检查每个字段是否是数组
+Object.keys(DATA).forEach(key => {
+    const val = DATA[key];
+    if (Array.isArray(val)) {
+        console.log("\n" + key + " 是数组，长度: " + val.length);
+        if (val.length > 0) {
+            console.log("  第一条数据的keys: " + Object.keys(val[0]).join(", "));
+        }
+    } else if (typeof val === "object" && val !== null) {
+        console.log(key + " 是对象，有 " + Object.keys(val).length + " 个属性");
+    }
+});
  
-console.log("\n========== 前1000字符 ==========");
-console.log($response.body.substring(0, 1000));
+console.log("\n========== 完整JSON(前2000字符) ==========");
+console.log(JSON.stringify(RAW).substring(0, 2000));
  
 $done({ body: $response.body });
