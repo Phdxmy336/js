@@ -8,7 +8,7 @@
 *******************************
 [rewrite_local]
 # >岗位练兵
-^https:\/\/zhgh\.baocloud\.cn\/union\/handTrainingController\/tquestionsList url script-request-body https://raw.githubusercontent.com/Phdxmy336/js/main/Lianbing.js
+^https:\/\/zhgh\.baocloud\.cn\/union\/handTrainingController\/tquestionsList url script-response-body https://raw.githubusercontent.com/Phdxmy336/js/main/Lianbing.js
 
 [mitm]
 hostname = zhgh.baocloud.cn
