@@ -17,142 +17,92 @@ hostname = mobile.baowugroup.com
 */
 
 
-// 题目答案提取器 - Quantumult X 专用 
-// 用于自动提取多选题、单选题、判断题的题目和答案并导出到日志 
+// 题目答案提取器 v2.0
+// 适用于安全考试/答题类应用
  
 const scriptName = "题目答案提取器";
+const TYPE_MAP = { "0": "判断题", "1": "单选题", "2": "多选题" };
  
-function main() {
-    // 获取原始数据（支持多种数据来源）
-    let rawData = null;
+function extractQuestions(rawData) {
+    if (!rawData) return { success: false, error: "无数据" };
     
-    // 方式1：从HTTP响应体获取 
-    if ($task && $task.response && $task.response.body) {
-        rawData = $task.response.body;
-    }
-    // 方式2：从Surge/QuanX响应体获取 
-    else if ($response && $response.body) {
-        rawData = $response.body;
-    }
-    // 方式3：从环境变量获取测试数据 
-    else if (typeof $env !== "undefined" && $env.testData) {
-        rawData = $env.testData;
-    }
-    
-    if (!rawData) {
-        console.log("❌ [错误] 未获取到有效数据");
-        return;
-    }
-    
-    // 解析JSON数据 
-    let jsonData;
-    try {
-        jsonData = JSON.parse(rawData);
-    } catch (e) {
-        console.log(`❌ [JSON解析错误] ${e.message}`);
-        return;
-    }
-    
-    // 提取题目列表（兼容多种数据结构）
+    // 尝试多种数据结构
     let questions = [];
+    const json = typeof rawData === "string" ? JSON.parse(rawData) : rawData;
     
-    if (Array.isArray(jsonData)) {
-        questions = jsonData;
-    } else if (jsonData.data && Array.isArray(jsonData.data)) {
-        questions = jsonData.data;
-    } else if (jsonData.questions && Array.isArray(jsonData.questions)) {
-        questions = jsonData.questions;
-    } else if (jsonData.result && Array.isArray(jsonData.result)) {
-        questions = jsonData.result;
+    // 路径1: data[]
+    if (json.data && Array.isArray(json.data)) questions = json.data;
+    // 路径2: questions[]
+    else if (json.questions && Array.isArray(json.questions)) questions = json.questions;
+    // 路径3: result[]
+    else if (json.result && Array.isArray(json.result)) questions = json.result;
+    // 路径4: 直接是数组
+    else if (Array.isArray(json)) questions = json;
+    // 路径5: 嵌套在其他字段 
+    else {
+        for (let key in json) {
+            if (Array.isArray(json[key]) && json[key].length > 0) {
+                if (json[key][0].questionStem || json[key][0].title) {
+                    questions = json[key];
+                    break;
+                }
+            }
+        }
     }
     
     if (questions.length === 0) {
-        console.log("⚠ ️  [警告] 未找到题目数据");
+        console.log("JSON结构预览:", JSON.stringify(json).响应体获取
+    if ($task?.response?.body) rawData = $task.response.body;
+    else if ($response?.body) rawData = $response.body;
+    else if (typeof testData !== "undefined") rawData = testData;
+    
+    if (!rawData) {
+        console.log("❌ 未获取到数据");
         return;
     }
     
-    // 题型映射 
-    const typeMap = {
-        "0": "判断题",
-        "1": "单选题",
-        "2": "多选题"
-    };
+    const result = extractQuestions(rawData);
+    if (!result.success || result.data.length === 0) {
+        console.log("❌ 解析失败:", result.error);
+        return;
+    }
     
-    // 存储提取结果 
-    let output = "";
-    let count = { total: 0, danxuan: 0, duoxuan: 0, panduan: 0 };
+    const questions = result.data;
+    const stats = { total: 0, danxuan: 0, duoxuan: 0, panduan: 0 };
     
-    console.log("═══════════════════════════════════════");
-    console.log(`📋 ${scriptName} - 开始提取`);
-    console.log(`📊 共发现 ${questions.length} 道题目`);
-    console.log("═══════════════════════════════════════\n");
+    console.log("═══════════════════════════════════");
+    console.log(`📋 提取到 ${questions.length} 道题目`);
+    console.log("═══════════════════════════════════\n");
     
-    // 遍历处理每道题目 
-    questions.forEach((question, index) => {
-        const typeCode = question.questionsType || question.type || "1";
-        const typeName = typeMap[typeCode] || "未知题型";
-        const stem = question.questionStem || question.title || question.stem || "【无题目】";
+    questions.forEach((q, i) => {
+        const type = TYPE_MAP[q.questionsType] || TYPE_MAP[q.type] || "未知";
+        const stem = q.questionStem || q.title || q.stem || "【无题目】";
+        const options = q.optionItem || q.options || q.choices || [];
         
-        // 更新计数 
-        count.total++;
-        if (typeCode === "0") count.panduan++;
-        else if (typeCode === "1") count.danxuan++;
-        else if (typeCode === "2") count.duoxuan++;
-        
-        // 提取选项 
-        let options = question.optionItem || question.options || question.choices || [];
-        
-        // 提取正确答案 
-        let answerKeys = [];
-        
+        // 提取答案
+        let answers = [];
         if (Array.isArray(options)) {
-            options.forEach((opt, optIndex) => {
-                // 兼容不同的选项格式 
-                let isCorrect = false;
-                
-                if (typeof opt === "object") {
-                    // 对象格式：{ optionKey: "A", optionValue: "...", ifReply: "1" }
-                    isCorrect = opt.ifReply === "1" || opt.isCorrect === true || opt.correct === true;
-                    if (isCorrect && opt.optionKey) {
-                        answerKeys.push(opt.optionKey);
-                    }
-                } else if (typeof opt === "string") {
-                    // 字符串格式，需要根据上下文判断 
-                    // 这里可以添加自定义逻辑 
+            options.forEach(opt => {
+                if (typeof opt === "object" && opt.ifReply === "1") {
+                    answers.push(opt.optionKey);
                 }
             });
         }
         
-        // 格式化答案 
-        const answerStr = answerKeys.length > 0 ? answerKeys.join("") : "无正确答案标记";
+        // 统计
+        stats.total++;
+        if (q.questionsType === "0") stats.panduan++;
+        else if (q.questionsType === "1") stats.danxuan++;
+        else if (q.questionsType === "2") stats.duoxuan++;
         
-        // 构建输出行 
-        const separator = "─".repeat(50);
-        output += `${separator}\n`;
-        output += `【${index + 1}】${typeName}\n`;
-        output += `题目：${stem}\n`;
-        output += `答案：${answerStr}\n`;
-        
-        // 输出到控制台 
-        console.log(`【${index + 1}】${typeName}`);
-        console.log(`   题目：${stem}`);
-        console.log(`   答案：${answerStr}\n`);
+        console.log(`【${i+1}】${type}`);
+        console.log(`题目: ${stem}`);
+        console.log(`答案: ${answers.join("") || "无标记"}\n`);
     });
     
-    // 输出统计信息 
-    console.log("═══════════════════════════════════════");
-    console.log("📈 统计汇总");
-    console.log(`   总计：${count.total} 题`);
-    console.log(`   单选题：${count.danxuan} 题`);
-    console.log(`   多选题：${count.duoxuan} 题`);
-    console.log(`   判断题：${count.panduan} 题`);
-    console.log("═══════════════════════════════════════");
-    
-    // 保存完整结果到环境变量（方便后续使用）
-    if (typeof $env !== "undefined") {
-        $env.extractedData = output;
-    }
+    console.log("═══════════════════════════════════");
+    console.log(`📊 单选:${stats.danxuan} 多选:${stats.duoxuan} 判断:${stats.panduan}`);
+    console.log("═══════════════════════════════════");
 }
  
-// 执行主函数 
 main();
