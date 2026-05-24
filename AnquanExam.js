@@ -17,9 +17,8 @@ hostname = mobile.baowugroup.com
 */
 
 
-// 考试数据解析器 - 提取题目与答案
-// 触发方式：建议搭配抓包规则的 HTTP-Response 使用 
-// 目标：解析JSON，提取题目前6字和正确答案，输出到日志 
+// 考试数据解析器 - 提取题目与答案 
+// 目标：解析JSON，提取题目前15字和正确答案，输出到日志 
  
 let body = $response.body;
 // 检查是否是有效的JSON响应，可根据实际URL或特征调整 
@@ -83,9 +82,9 @@ try {
                 default: typeStr = "未知题型";
             }
             
-            // 提取题目前6个字符（处理可能存在的换行和空格）
+            // 提取题目前15个字符（处理可能存在的换行和空格）
             let shortStem = q.stem.replace(/[\r\n\s]+/g, ' ').trim();
-            shortStem = shortStem.length > 6 ? shortStem.substring(0, 6) + '…' : shortStem;
+            shortStem = shortStem.length > 15 ? shortStem.substring(0, 15) + '…' : shortStem;
             
             // 提取正确答案（ifReply: "1"）
             let correctAnswers = [];
