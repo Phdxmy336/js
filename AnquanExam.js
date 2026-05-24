@@ -17,14 +17,30 @@ hostname = mobile.baowugroup.com
 */
 
 
-// 题目提取脚本 - 适用于Quantumult X
-// 自动提取题目和答案，只显示题目前6字和答案
+// 题目提取脚本 - 适用于Quantumult X 
+// 自动提取题目和答案，只显示题目前6字和答案 
  
 const 原始数据 = $response.body;
  
 try {
     const 数据 = JSON.parse(原始数据);
-    const 题目列表 = 数据.data.questionList || [];
+    
+    // 调试：打印数据结构 
+    console.log("数据结构：" + JSON.stringify(数据).substring(0, 500));
+    
+    // 尝试多个可能的数据路径 
+    let 题目列表 = [];
+    
+    if (数据.data?.questionList) {
+        题目列表 = 数据.data.questionList;
+    } else if (数据.data?.list) {
+        题目列表 = 数据.data.list;
+    } else if (数据.data?.questions) {
+        题目列表 = 数据.data.questions;
+    } else if (数据.data) {
+        // 如果 data 是数组 
+        题目列表 = Array.isArray(数据.data) ? 数据.data : [];
+    }
     
     let 输出内容 = [];
     输出内容.push("═══════════════════════════════");
@@ -39,24 +55,24 @@ try {
         let 类型名称 = "";
         let 答案 = "";
         
-        // 判断题目类型
-        if (类型 === "0") {
+        // 判断题目类型 
+        if (类型 === "0" || 类型 === 0) {
             类型名称 = "判断题";
-        } else if (类型 === "1") {
+        } else if (类型 === "1" || 类型 === 1) {
             类型名称 = "单选题";
-        } else if (类型 === "2") {
+        } else if (类型 === "2" || 类型 === 2) {
             类型名称 = "多选题";
         }
         
-        // 提取答案
-        const 选项列表 = 题目.questionsOptions || [];
-        const 正确答案列表 = 选项列表
-            .filter(选项 => 选项.ifReply === "1")
-            .map(选项 => 选项.optionItem);
+        // 提取答案 - 尝试多个可能的字段名 
+        const 选项列表 = 题目.questionsOptions || 题目.options || [];
+        const 正确答案列表 = 选项列表 
+            .filter(选项 => 选项.ifReply === "1" || 选项.ifReply === 1)
+            .map(选项 => 选项.optionItem || 选项.label);
         
         答案 = 正确答案列表.join("");
         
-        // 输出格式：类型 + 题目简写 + 答案
+        // 输出格式：类型 + 题目简写 + 答案 
         输出内容.push(`${类型名称}：${题目简写}`);
         输出内容.push(`答案：${答案}\n`);
     });
@@ -66,9 +82,7 @@ try {
     输出内容.push("═══════════════════════════════");
     
     console.log(输出内容.join("\n"));
-    $notify("✅ 题目提取完成", "", 输出内容.join("\n"));
     
 } catch (错误) {
     console.error("解析数据失败：" + 错误.message);
-    $notify("❌ 提取失败", "错误", 错误.message);
 }
