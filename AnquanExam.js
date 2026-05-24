@@ -17,60 +17,64 @@ hostname = mobile.baowugroup.com
 */
 
 
-// 提取题目和答案的Quantumult X脚本 
-const extractQuestions = () => {
-    try {
-        const response = JSON.parse($response.body);
-        if (!response || !response.isSuccess) return;
+// 题目提取脚本 - 适用于Quantumult X
+// 自动提取题目和答案，只显示题目前6字和答案
  
-        let output = "";
+const 题目提取 = {
+    doIt: async function () {
+        const 原始数据 = $response.body;
         
-        if (response.replyDetailId && Array.isArray(response.questionsOptions)) {
-            response.questionsOptions.forEach(question => {
-                // 确定题型
-                let questionType = "";
-                switch(question.questionsType) {
-                    case "0":
-                        questionType = "判断题";
-                        break;
-                    case "1":
-                        questionType = "单选题";
-                        break;
-                    case "2":
-                        questionType = "多选题";
-                        break;
-                    default:
-                        questionType = "未知题型";
+        try {
+            const 数据 = JSON.parse(原始数据);
+            const 题目列表 = 数据.data.questionList || [];
+            
+            let 输出内容 = [];
+            输出内容.push("═══════════════════════════════");
+            输出内容.push("📝 题目提取结果");
+            输出内容.push("═══════════════════════════════\n");
+            
+            题目列表.forEach((题目, 索引) => {
+                const 类型 = 题目.questionsType;
+                const 题干 = 题目.questionStem || "";
+                const 题目简写 = 题干.substring(0, 6) + "…";
+                
+                let 类型名称 = "";
+                let 答案 = "";
+                
+                // 判断题目类型
+                if (类型 === "0") {
+                    类型名称 = "判断题";
+                } else if (类型 === "1") {
+                    类型名称 = "单选题";
+                } else if (类型 === "2") {
+                    类型名称 = "多选题";
                 }
                 
-                // 提取题目 
-                const stem = question.questionStem || "无题目内容";
+                // 提取答案
+                const 选项列表 = 题目.questionsOptions || [];
+                const 正确答案列表 = 选项列表
+                    .filter(选项 => 选项.ifReply === "1")
+                    .map(选项 => 选项.optionItem);
                 
-                // 提取正确答案 
-                let correctAnswers = [];
-                if (question.questionsOptions && Array.isArray(question.questionsOptions)) {
-                    question.questionsOptions.forEach(option => {
-                        if (option.ifReply === "1") {
-                            correctAnswers.push(option.optionItem);
-                        }
-                    });
-                }
+                答案 = 正确答案列表.join("");
                 
-                // 构建输出 
-                output += `${questionType}：${stem}\n`;
-                output += `答案：${correctAnswers.join("")}\n\n`;
+                // 输出格式：类型 + 题目简写 + 答案
+                输出内容.push(`${类型名称}：${题目简写}`);
+                输出内容.push(`答案：${答案}\n`);
             });
             
-            // 输出到Quantumult X日志
-            console.log(output);
-            $notify("题目提取完成", "", `已提取${response.questionsOptions.length}道题目`);
+            输出内容.push("═══════════════════════════════");
+            输出内容.push(`共提取 ${题目列表.length} 道题目`);
+            输出内容.push("═══════════════════════════════");
+            
+            console.log(输出内容.join("\n"));
+            $notify("✅ 题目提取完成", "", 输出内容.join("\n"));
+            
+        } catch (错误) {
+            console.error("解析数据失败：" + 错误.message);
         }
-    } catch (e) {
-        console.log(`解析错误：${e}`);
-        $notify("解析错误", "", e.message);
     }
 };
  
-// 执行提取 
-extractQuestions();
-$done();
+$taskMgr = $taskMgr || {};
+题目提取.doIt();
