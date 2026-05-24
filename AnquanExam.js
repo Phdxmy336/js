@@ -17,72 +17,161 @@ hostname = mobile.baowugroup.com
 */
 
 
-// 题目提取脚本 - 适用于Quantumult X 
-// 自动提取题目和答案，只显示题目前6字和答案 
+// 抓包重写 - 题目答案提取器
+// 使用说明：添加到Quantumult X的Rewrite或Task模块，匹配相关请求URL 
  
-const 原始数据 = $response.body;
+let body = $response.body;
+let logResults = []; // 存储提取结果的数组 
  
 try {
-    const 数据 = JSON.parse(原始数据);
+    // 尝试解析JSON响应 
+    let data = JSON.parse(body);
     
-    // 调试：打印数据结构 
-    console.log("数据结构：" + JSON.stringify(数据).substring(0, 500));
+    // 检查是否有题目数据（根据您的数据结构，题目通常在数组里）
+    if (data && data.data && Array.isArray(data.data)) {
+        let questions = data.data;
+        
+        questions.forEach((question, index) => {
+            // 只处理包含有效信息的题目 
+            if (question.questionStem && question.questionsType !== undefined) {
+                let result = processQuestion(question);
+                if (result) {
+                    logResults.push(result);
+                }
+            }
+        });
+        
+        // 如果有提取到题目，输出到日志 
+        if (logResults.length > 0) {
+            outputToLog(logResults);
+        }
+    }
+} catch (e) {
+    // 如果JSON解析失败或数据格式不同，尝试其他处理方式
+    handleLargeData(body);
+}
+ 
+function processQuestion(question) {
+    let questionType = "";
+    let answer = "";
     
-    // 尝试多个可能的数据路径 
-    let 题目列表 = [];
-    
-    if (数据.data?.questionList) {
-        题目列表 = 数据.data.questionList;
-    } else if (数据.data?.list) {
-        题目列表 = 数据.data.list;
-    } else if (数据.data?.questions) {
-        题目列表 = 数据.data.questions;
-    } else if (数据.data) {
-        // 如果 data 是数组 
-        题目列表 = Array.isArray(数据.data) ? 数据.data : [];
+    // 判断题目类型 
+    switch(question.questionsType) {
+        case "0":
+            questionType = "判断题";
+            break;
+        case "1":
+            questionType = "单选题";
+            break;
+        case "2":
+            questionType = "多选题";
+            break;
+        default:
+            questionType = "未知题型";
     }
     
-    let 输出内容 = [];
-    输出内容.push("═══════════════════════════════");
-    输出内容.push("📝 题目提取结果");
-    输出内容.push("═══════════════════════════════\n");
+    // 提取题目前6个字
+    let questionPreview = question.questionStem;
+    if (questionPreview && questionPreview.length > 6) {
+        questionPreview = questionPreview.substring(0, 6) + "…";
+    }
     
-    题目列表.forEach((题目) => {
-        const 类型 = 题目.questionsType;
-        const 题干 = 题目.questionStem || "";
-        const 题目简写 = 题干.substring(0, 6) + "…";
+    // 提取正确答案
+    if (question.questionsOptions && Array.isArray(question.questionsOptions)) {
+        let correctOptions = [];
+        question.questionsOptions.forEach(option => {
+            if (option.ifReply === "1") {
+                correctOptions.push(option.optionItem);
+            }
+        });
+        answer = correctOptions.join("");
+    }
+    
+    // 如果找到答案，返回格式化结果
+    if (answer) {
+        return `${questionType}：${questionPreview}\n答案：${answer}`;
+    }
+    
+    return null;
+}
+ 
+function handleLargeData(body) {
+    // 处理大数据的备选方案：使用正则表达式直接提取
+    let pattern = /"questionsType":"(\d)","questionStem":"([^"]+?)".*?"questionsOptions":\[(.*?)\]/g;
+    let match;
+    let chunkSize = 50000; // 每次处理50KB，防止内存溢出 
+    let processed = 0;
+    
+    while (processed < body.length) {
+        let chunk = body.substring(processed, processed + chunkSize);
+        processed += chunkSize;
         
-        let 类型名称 = "";
-        let 答案 = "";
+        // 重置正则表达式 
+        pattern.lastIndex = 0;
         
-        // 判断题目类型 
-        if (类型 === "0" || 类型 === 0) {
-            类型名称 = "判断题";
-        } else if (类型 === "1" || 类型 === 1) {
-            类型名称 = "单选题";
-        } else if (类型 === "2" || 类型 === 2) {
-            类型名称 = "多选题";
+        while ((match = pattern.exec(chunk)) !== null) {
+            let questionType = match[1];
+            let questionStem = match[2];
+            let optionsStr = match[3];
+            
+            // 提取正确答案 
+            let answerPattern = /"optionItem":"([A-Z])","optionContent".*?"ifReply":"1"/g;
+            let answerMatch;
+            let answers = [];
+            
+            while ((answerMatch = answerPattern.exec(optionsStr)) !== null) {
+                answers.push(answerMatch[1]);
+            }
+            
+            if (answers.length > 0) {
+                let typeName = getTypeName(questionType);
+                let preview = questionStem.length > 6 ? questionStem.substring(0, 6) + "…" : questionStem;
+                logResults.push(`${typeName}：${preview}\n答案：${answers.join("")}`);
+            }
         }
-        
-        // 提取答案 - 尝试多个可能的字段名 
-        const 选项列表 = 题目.questionsOptions || 题目.options || [];
-        const 正确答案列表 = 选项列表 
-            .filter(选项 => 选项.ifReply === "1" || 选项.ifReply === 1)
-            .map(选项 => 选项.optionItem || 选项.label);
-        
-        答案 = 正确答案列表.join("");
-        
-        // 输出格式：类型 + 题目简写 + 答案 
-        输出内容.push(`${类型名称}：${题目简写}`);
-        输出内容.push(`答案：${答案}\n`);
+    }
+    
+    if (logResults.length > 0) {
+        outputToLog(logResults);
+    }
+}
+ 
+function getTypeName(typeCode) {
+    switch(typeCode) {
+        case "0": return "判断题";
+        case "1": return "单选题";
+        case "2": return "多选题";
+        default: return "未知题型";
+    }
+}
+ 
+function outputToLog(results) {
+    let timestamp = new Date().toLocaleString();
+    let output = `\n=== 题目答案提取结果 (${timestamp}) ===\n`;
+    output += `共提取 ${results.length} 道题目\n\n`;
+    
+    results.forEach((result, index) => {
+        output += `${index + 1}. ${result}\n\n`;
     });
     
-    输出内容.push("═══════════════════════════════");
-    输出内容.push(`共提取 ${题目列表.length} 道题目`);
-    输出内容.push("═══════════════════════════════");
+    output += "=== 提取完成 ===\n";
     
-    console.log(输出内容.join("\n"));
+    // 输出到Quantumult X日志 
+    console.log(output);
     
-} catch (错误) {
-    console.error("解析数据失败：" + 错误.message);
+    // 同时保存到持久化存储（如果需要）
+    $persistentStore.write(output, "exam_answers");
 }
+ 
+// 任务调度版本（处理超时问题）
+if (typeof $task !== 'undefined') {
+    // 如果作为定时任务运行，添加超时保护 
+    setTimeout(() => {
+        if (logResults.length === 0) {
+            console.log("⚠ ️ 数据处理超时，尝试分块处理...");
+            // 可以在这里添加分块处理的逻辑
+        }
+    }, 5000); // 5秒超时 
+}
+ 
+$done({});
