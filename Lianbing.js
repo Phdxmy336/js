@@ -17,90 +17,46 @@ hostname = zhgh.baocloud.cn
 */
 
 
-// ========== 主逻辑 ==========
-const body = $response.body;
-const result = [];
-let totalCount = 0;
-let successCount = 0;
+// Quantumult X Rewrite Script: 提取题目与答案并通知 (带序号版)
+(() => {
+    'use strict';
+    // 获取响应体
+    const response = $response;
+    let body = response.body;
  
-try {
-    const jsonData = JSON.parse(body);
-    
-    // 检查数据结构
-    if (!jsonData || !jsonData.topicIdArr || !Array.isArray(jsonData.topicIdArr)) {
-        console.log("⚠️ 未找到题目数组(topicIdArr)，请检查抓包数据是否正确。");
-        console.log("响应数据前200字符: " + body.substring(0, 200));
-        $notification.post(
-            "题目提取失败", 
-            "数据结构异常", 
-            "未找到topicIdArr字段，请确认重写规则匹配的API是否正确"
-        );
-        $done({ body: body });
-    }
-    
-    const questions = jsonData.topicIdArr;
-    totalCount = questions.length;
-    console.log(`📋 共检测到 ${totalCount} 道题目，开始提取...`);
-    
-    // 分批处理参数 
-    const batchSize = 8;
-    let processedCount = 0;
-    
-    for (let i = 0; i < questions.length; i++) {
-        const question = questions[i];
-        const trainTopic = question?.trainTopic;
-        
-        if (trainTopic) {
-            const topicName = trainTopic.topicName || "【题目缺失】";
-            const correctAnswer = trainTopic.ext1 || "【答案缺失】";
-            result.push(`题目：${topicName}\n答案：${correctAnswer}`);
-            successCount++;
-        } else {
-            console.log(`⚠️ 第${i+1}题缺少trainTopic字段，已跳过`);
+    try {
+        const dataObj = JSON.parse(body);
+        const topicArray = dataObj.topicIdArr;
+ 
+        if (!topicArray || !Array.isArray(topicArray)) {
+            console.log("响应体中未找到有效的题目数组 (topicIdArr)。");
+            $done({});
+            return;
         }
-        
-        processedCount++;
-        if (processedCount >= batchSize) {
-            console.log(`⏳ 处理进度：${i + 1}/${totalCount}`);
-            processedCount = 0;
-        }
-    }
-    
-    // ========== 输出结果到日志 ==========
-    if (result.length > 0) {
-        console.log("\n========== 🎯 提取结果（共" + result.length + "题） ==========\n");
-        result.forEach((item, index) => {
-            console.log(`【第${index + 1}题】`);
-            console.log(item);
-            console.log("----------------------------------------\n");
+ 
+        let notificationContent = "📚 题目与答案汇总\n\n";
+        let questionCount = 0;
+ 
+        topicArray.forEach((item, index) => {
+            const trainTopic = item.trainTopic;
+            if (trainTopic && trainTopic.topicName && trainTopic.ext1) {
+                questionCount++; // 计数器递增，代表当前是第几题
+                notificationContent += `第${questionCount}题\n题目：${trainTopic.topicName}\n答案：${trainTopic.ext1}\n`;
+                if (index < topicArray.length - 1) {
+                    notificationContent += "───\n";
+                }
+            } else {
+                console.log(`跳过第 ${index + 1} 项，缺少必要字段 (topicName 或 ext1)。`);
+            }
         });
-        console.log(`✅ 提取完成！共成功提取 ${result.length}/${totalCount} 道题目。`);
-        
-        // ========== ✅ 发送成功通知 ==========
-        $notification.post(
-            "✅ 题目提取成功",                               // 标题
-            `共提取 ${successCount}/${totalCount} 道题目`,    // 副标题
-            "请打开Quantumult X日志查看完整题目与答案"         // 内容
-        );
-    } else {
-        console.log("⚠️ 未能提取到任何有效题目，请检查数据结构。");
-        $notification.post(
-            "⚠ ️ 题目提取警告",
-            "未提取到有效题目",
-            "题目数据可能为空或结构不匹配，请检查日志"
-        );
-    }
-    
-} catch (error) {
-    console.log(`❌ JSON解析失败：${error.message}`);
-    console.log("原始数据前300字符: " + body.substring(0, 300));
-    $notification.post(
-        "❌ 题目提取异常",
-        `JSON解析失败: ${error.message}`,
-        "请检查API返回数据是否为有效JSON"
-    );
-}
  
-
-// 返回原始响应，不修改
-$done({});
+        notificationContent += `\n✅ 共提取 ${questionCount} 道题目。`;
+        $notify("抓包题目答案提取", `成功解析${questionCount}题`, notificationContent);
+ 
+    } catch (error) {
+        console.log("解析响应JSON时出错: " + error.message);
+        $notify("脚本执行错误", "解析失败", "响应体可能不是有效的JSON格式。");
+    }
+ 
+    $done({});
+})();
