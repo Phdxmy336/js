@@ -51,7 +51,7 @@ hostname = zhgh.baocloud.cn
         });
  
         notificationContent += `\n✅ 共提取 ${questionCount} 道题目。`;
-        $notify("抓包题目答案提取", `成功解析${questionCount}题`, notificationContent);
+        $notify("渣瑞牛逼", `成功解析${questionCount}题`, notificationContent);
  
     } catch (error) {
         console.log("解析响应JSON时出错: " + error.message);
