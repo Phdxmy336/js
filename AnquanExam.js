@@ -76,9 +76,9 @@ try {
             // 确定题型
             let typeStr;
             switch(q.type) {
-                case "0": typeStr = "判断题✅"; break;
-                case "1": typeStr = "单选题🅰️"; break;
-                case "2": typeStr = "多选题⭕️"; break;
+                case "0": typeStr = "❄️判断题"; break;
+                case "1": typeStr = "🔥单选题"; break;
+                case "2": typeStr = "⭐️多选题"; break;
                 default: typeStr = "未知题型";
             }
             
