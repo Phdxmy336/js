@@ -47,11 +47,11 @@ const ForceValue = getBox("ddm.zyyad.forcevalue", "false") === "true";
 
 // 各模块开关
 const EnableGold = getBox("ddm.zyyad.enablegold", "true") === "true";
-const EnableLevel = getBox("ddm.zyyad.enablelevel", "false") === "true";
+const EnableLevel = getBox("ddm.zyyad.enablelevel", "true") === "true";
 const EnableWeapon = getBox("ddm.zyyad.enableweapon", "true") === "true";
-const EnableSkill = getBox("ddm.zyyad.enableskill", "false") === "true";
-const EnableAvatar = getBox("ddm.zyyad.enableavatar", "false") === "true";
-const EnableRegister = getBox("ddm.zyyad.enableregister", "false") === "true";
+const EnableSkill = getBox("ddm.zyyad.enableskill", "true") === "true";
+const EnableAvatar = getBox("ddm.zyyad.enableavatar", "true") === "true";
+const EnableRegister = getBox("ddm.zyyad.enableregister", "true") === "true";
 
 // 数值修改
 function setValue(data, key, value) {
@@ -74,7 +74,7 @@ const Gold = Number(getBox("ddm.zyyad.gold", 5827));
 const RegisterDay = Number(getBox("ddm.zyyad.registerday", 7));
 
 // 设置等级级数
-const Level = Number(getBox("ddm.zyyad.level", 999));
+const Level = Number(getBox("ddm.zyyad.level", 1999));
 
 // 0 = 关闭
 // 1 = 自动补充已有武器碎片
