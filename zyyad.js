@@ -74,7 +74,7 @@ const Gold = Number(getBox("ddm.zyyad.gold", 5827));
 const RegisterDay = Number(getBox("ddm.zyyad.registerday", 7));
 
 // 设置等级级数
-const Level = Number(getBox("ddm.zyyad.level", 1999));
+const Level = Number(getBox("ddm.zyyad.level", 827));
 
 // 0 = 关闭
 // 1 = 自动补充已有武器碎片
@@ -102,8 +102,8 @@ const WeaponList=[[1,50],[2,50],[3,50],[4,50],[5,50],[6,50],[7,50],[8,50],[9,50]
 
 // 技能列表
 const SkillList = [
+  [10], //攻速符
   [4], //神兵符
-  [10], //速攻符
   [11], //降妖符
   [12], //农民
   [13], //招贤榜
