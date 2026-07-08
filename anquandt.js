@@ -14,6 +14,7 @@
 hostname = zhgh.baocloud.cn
 *
 *
+*/
  
 const KEY = 'auto_exam_answers';  // 持久化存储的键名 
 const TOTAL = 20;                // 总题数 
