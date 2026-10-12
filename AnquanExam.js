@@ -187,7 +187,44 @@ const questions = Array.from(questionMap.values())
             "2": "多选题"
         };
 
+        
+        // 各题型独立编号
+        const questionCounters = {
+            "1": 0, // 单选题
+            "2": 0, // 多选题
+            "0": 0  // 判断题
+        };
+
         questions.forEach((q, index) => {
+            // 当前题型序号加1
+            questionCounters[q.type]++;
+
+            const questionNumber = questionCounters[q.type];
+
+            // 题型名称
+            const typeStr = typeNames[q.type] || "未知题型";
+
+            // 提取题目前15个字
+            let shortStem = q.stem;
+
+            if (shortStem.length > 15) {
+                shortStem = shortStem.substring(0, 15) + "…";
+            }
+
+            // 正确答案
+            const answerStr = Array.from(q.answers)
+                .sort()
+                .join("") || "未找到答案";
+
+            // 输出题型、序号、题干
+            output += `${typeStr}${questionNumber}：${shortStem}\n`;
+            output += `答案：${answerStr}\n`;
+
+            if (index < questions.length - 1) {
+                output += "----\n";
+            }
+        });
+
             let shortStem = q.stem;
 
             if (shortStem.length > 15) {
