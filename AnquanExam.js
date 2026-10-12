@@ -1,126 +1,159 @@
+
 /*
- *
- *
 脚本功能：安全e家答题
 脚本作者：Phdxmy（687618）
 更新时间：2026年
-使用声明：此脚本仅供学习与交流，请在下载使用24小时内删除！请勿转载与贩卖！
-*******************************
+修复：题目重复显示、重复递归、重复调用
+
 [rewrite_local]
 # >安全E家答题
 ^https:\/\/mobile\.baowugroup\.com\/com\.baosight\.wisdomsecurity\/service\/bggfab-px\/mobileapi\/startExam url script-response-body https://raw.githubusercontent.com/Phdxmy336/js/main/AnquanExam.js
 
 [mitm]
 hostname = mobile.baowugroup.com
-*
-*
 */
 
+const body = $response.body;
 
-// 考试数据解析器 - 提取题目与答案 
-// 目标：解析JSON，提取题目前15字和正确答案，输出到日志 
- 
-let body = $response.body;
-// 检查是否是有效的JSON响应，可根据实际URL或特征调整 
 try {
-    // 尝试解析JSON
-    let jsonData = JSON.parse(body);
-    
-    // 核心解析函数，处理可能嵌套的数据结构 
-    function parseExamData(data, resultArray = []) {
-        // 检查数据是否为数组
+    const jsonData = JSON.parse(body);
+    const questionMap = new Map();
+    const visited = new Set();
+
+    // 统一题干格式，消除不影响题意的格式差异
+    function normalizeStem(stem) {
+        return String(stem || '')
+            .replace(/<[^>]*>/g, '')
+            .replace(/&nbsp;/gi, ' ')
+            .replace(/\s+/g, '')
+            .replace(/[　\u200B-\u200D\uFEFF]/g, '')
+            .trim();
+    }
+
+    // 解析题目
+    function parseExamData(data) {
+        if (!data || typeof data !== 'object') return;
+        if (visited.has(data)) return;
+
+        visited.add(data);
+
         if (Array.isArray(data)) {
-            for (let item of data) {
-                parseExamData(item, resultArray);
-            }
-        } 
-        // 检查数据是否为对象，并包含题目列表
-        else if (typeof data === 'object' && data !== null) {
-            // 查找题目数组：dxexamQuestionsVos 或其他可能的字段
-            let questionArrays = ['dxexamQuestionsVos', 'questions', 'questionList', 'list'];
-            for (let key of questionArrays) {
-                if (data[key] && Array.isArray(data[key])) {
-                    parseExamData(data[key], resultArray);
-                }
-            }
-            
-            // 如果当前对象包含题目信息（根据提供的JSON结构判断）
-            if (data.questionStem && (data.questionsType === "0" || data.questionsType === "1" || data.questionsType === "2")) {
-                let question = {
-                    stem: data.questionStem,
-                    type: data.questionsType,
-                    options: data.questionsOptions || [],
-                    no: data.questionsNo || '未知编号'
-                };
-                resultArray.push(question);
-            }
-            
-            // 递归遍历对象的所有值，以应对深层嵌套
-            for (let subKey in data) {
-                if (data.hasOwnProperty(subKey) && typeof data[subKey] === 'object') {
-                    parseExamData(data[subKey], resultArray);
+            data.forEach(parseExamData);
+            return;
+        }
+
+        const type = String(data.questionsType);
+
+        if (
+            data.questionStem != null &&
+            ['0', '1', '2'].includes(type)
+        ) {
+            const stem = normalizeStem(data.questionStem);
+
+            if (stem) {
+                // 核心修复：只根据题型和完整题干去重
+                const key = JSON.stringify([type, stem]);
+
+                const options = Array.isArray(data.questionsOptions)
+                    ? data.questionsOptions
+                    : [];
+
+                const answers = options
+                    .filter(opt =>
+                        opt &&
+                        String(opt.ifReply) === '1' &&
+                        opt.optionItem != null
+                    )
+                    .map(opt => String(opt.optionItem).trim())
+                    .filter(Boolean);
+
+                if (!questionMap.has(key)) {
+                    questionMap.set(key, {
+                        stem: String(data.questionStem),
+                        type: type,
+                        no: data.questionsNo || '未知编号',
+                        answers: new Set(answers)
+                    });
+                } else {
+                    // 重复题目：合并正确答案
+                    const existing = questionMap.get(key);
+
+                    answers.forEach(answer => {
+                        existing.answers.add(answer);
+                    });
                 }
             }
         }
-        return resultArray;
+
+        // 只递归一次，避免重复扫描
+        Object.keys(data).forEach(key => {
+            const value = data[key];
+
+            if (value && typeof value === 'object') {
+                parseExamData(value);
+            }
+        });
     }
-    
-    // 开始解析数据
-    let questions = parseExamData(jsonData);
-    
+
+    parseExamData(jsonData);
+
+    const questions = Array.from(questionMap.values());
+
     if (questions.length > 0) {
         let output = `📚 发现 ${questions.length} 道题目\n`;
         output += `====================\n`;
-        
+
+        const typeNames = {
+            '0': '❄️判断题',
+            '1': '🔥单选题',
+            '2': '⭐️多选题'
+        };
+
         questions.forEach((q, index) => {
-            // 确定题型
-            let typeStr;
-            switch(q.type) {
-                case "0": typeStr = "❄️判断题"; break;
-                case "1": typeStr = "🔥单选题"; break;
-                case "2": typeStr = "⭐️多选题"; break;
-                default: typeStr = "未知题型";
+            const typeStr = typeNames[q.type] || '未知题型';
+
+            let shortStem = q.stem
+                .replace(/<[^>]*>/g, '')
+                .replace(/\s+/g, ' ')
+                .trim();
+
+            if (shortStem.length > 15) {
+                shortStem = shortStem.substring(0, 15) + '…';
             }
-            
-            // 提取题目前15个字符（处理可能存在的换行和空格）
-            let shortStem = q.stem.replace(/[\r\n\s]+/g, ' ').trim();
-            shortStem = shortStem.length > 15 ? shortStem.substring(0, 15) + '…' : shortStem;
-            
-            // 提取正确答案（ifReply: "1"）
-            let correctAnswers = [];
-            if (Array.isArray(q.options)) {
-                q.options.forEach(opt => {
-                    if (opt.ifReply === "1" && opt.optionItem) {
-                        correctAnswers.push(opt.optionItem);
-                    }
-                });
+
+            let answerStr = Array.from(q.answers)
+                .sort()
+                .join('');
+
+            if (!answerStr) {
+                answerStr = '未找到答案';
             }
-            
-            // 格式化答案字符串 
-            let answerStr = correctAnswers.sort().join('');
-            if (answerStr === '') answerStr = '未找到答案';
-            
-            // 构建输出行 
+
             output += `${typeStr}：${shortStem}\n`;
             output += `答案：${answerStr}\n`;
-            if (index < questions.length - 1) output += `----\n`;
+
+            if (index < questions.length - 1) {
+                output += `----\n`;
+            }
         });
-        
-        output += `====================\n问题反馈：687618`;
-        
-        // 输出到Quantumult X日志
+
+        output += `====================\n`;
+        output += `问题反馈：687618`;
+
         console.log(output);
-        $notify("📖 题目解析完成", `共提取 ${questions.length} 题`, output);
-        
+
+        $notify(
+            '📖 题目解析完成',
+            `共提取 ${questions.length} 题`,
+            output
+        );
+
     } else {
-        console.log("⚠️ 未在响应数据中找到题目信息。");
+        console.log('⚠️ 未在响应数据中找到题目信息。');
     }
-    
+
 } catch (error) {
-    // 如果不是JSON或解析失败，静默处理（可能是其他类型的响应）
-    // console.log("解析失败或非目标数据: " + error.message);
+    console.log('⚠️ 题目解析失败：' + error.message);
+} finally {
+    $done({});
 }
- 
-// 无论成功与否，都返回原始body，不影响正常使用
-$done({}); 
-$done({});
