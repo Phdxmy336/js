@@ -2,9 +2,7 @@
 /*
 脚本功能：安全e家答题
 脚本作者：Phdxmy（687618）
-版本：v3.0
-修复：单选题重复显示
-增加：版本标识、重复检测日志
+版本：v3.2
 
 [rewrite_local]
 # >安全E家答题
@@ -14,27 +12,29 @@
 hostname = mobile.baowugroup.com
 */
 
-const VERSION = "v3.0";
-console.log("✅ 安全考试脚本版本：" + VERSION);
+const VERSION = 'v3.2';
+
+console.log('✅ 安全考试脚本版本：' + VERSION);
 
 try {
     const jsonData = JSON.parse($response.body);
     const visited = new Set();
-    const allQuestions = [];
     const questionMap = new Map();
+    let rawCount = 0;
 
-    function normalize(str) {
-        return String(str == null ? "" : str)
-            .replace(/<[^>]*>/g, "")
-            .replace(/&nbsp;/gi, " ")
-            .replace(/&amp;/gi, "&")
-            .replace(/[\s\u200B-\u200D\uFEFF]/g, "")
+    // 统一题干格式
+    function normalize(value) {
+        return String(value == null ? '' : value)
+            .replace(/<[^>]*>/g, '')
+            .replace(/&nbsp;/gi, ' ')
+            .replace(/&amp;/gi, '&')
+            .replace(/[\s\u200B-\u200D\uFEFF]/g, '')
             .trim();
     }
 
+    // 递归提取题目
     function extract(data) {
-        if (!data || typeof data !== "object") return;
-        if (visited.has(data)) return;
+        if (!data || typeof data !== 'object' || visited.has(data)) return;
 
         visited.add(data);
 
@@ -47,11 +47,13 @@ try {
 
         if (
             data.questionStem != null &&
-            ["0", "1", "2"].includes(type)
+            ['0', '1', '2'].includes(type)
         ) {
             const stem = normalize(data.questionStem);
 
             if (stem) {
+                rawCount++;
+
                 const options = Array.isArray(data.questionsOptions)
                     ? data.questionsOptions
                     : [];
@@ -59,23 +61,34 @@ try {
                 const answers = options
                     .filter(opt =>
                         opt &&
-                        String(opt.ifReply) === "1" &&
+                        String(opt.ifReply) === '1' &&
                         opt.optionItem != null
                     )
                     .map(opt => String(opt.optionItem).trim())
                     .filter(Boolean);
 
-                allQuestions.push({
-                    stem: stem,
-                    type: type,
-                    answers: answers,
-                    no: data.questionsNo || ""
-                });
+                const key = type + '|' + stem;
+
+                // 根据题型和完整题干去重
+                if (!questionMap.has(key)) {
+                    questionMap.set(key, {
+                        type: type,
+                        stem: stem,
+                        answers: new Set(answers)
+                    });
+                } else {
+                    const existing = questionMap.get(key);
+
+                    answers.forEach(answer => {
+                        existing.answers.add(answer);
+                    });
+                }
             }
         }
 
+        // 遍历嵌套数据
         Object.keys(data).forEach(key => {
-            if (data[key] && typeof data[key] === "object") {
+            if (data[key] && typeof data[key] === 'object') {
                 extract(data[key]);
             }
         });
@@ -83,182 +96,83 @@ try {
 
     extract(jsonData);
 
-    let duplicateCount = 0;
-    let fuzzyCount = 0;
+    // 排序：单选 → 多选 → 判断
+    const typeOrder = {
+        '1': 0,
+        '2': 1,
+        '0': 2
+    };
 
-    allQuestions.forEach(q => {
-        const fullKey = q.type + "|" + q.stem;
-
-        // 首先使用完整题干匹配
-        let key = fullKey;
-
-        if (!questionMap.has(key)) {
-            // 对仍未匹配的题目，检查是否为疑似重复
-            const candidates = Array.from(questionMap.entries());
-
-            for (const [oldKey, oldQ] of candidates) {
-                if (oldQ.type !== q.type) continue;
-
-                const samePrefix =
-                    q.stem.substring(0, 15) ===
-                    oldQ.stem.substring(0, 15);
-
-                const sameAnswer =
-                    [...q.answers].sort().join(",") ===
-                    [...oldQ.answers].sort().join(",");
-
-                // 仅在题型、前15字、正确答案均相同
-                // 时进行兜底去重
-                if (samePrefix && sameAnswer) {
-                    key = oldKey;
-
-                    if (q.stem !== oldQ.stem) {
-                        fuzzyCount++;
-
-                        console.log(
-                            "🔍 疑似重复题干差异：" +
-                            "\n第一题：" + oldQ.stem +
-                            "\n第二题：" + q.stem
-                        );
-                    }
-
-                    break;
-                }
-            }
-        }
-
-        if (questionMap.has(key)) {
-            duplicateCount++;
-
-            const existing = questionMap.get(key);
-
-            q.answers.forEach(answer => {
-                existing.answers.add(answer);
-            });
-        } else {
-            questionMap.set(key, {
-                stem: q.stem,
-                type: q.type,
-                answers: new Set(q.answers)
-            });
-        }
-    });
-
-// 题型排序：单选题 → 多选题 → 判断题
-
-// 1 = 单选题
-
-// 2 = 多选题
-
-// 0 = 判断题
-
-const typeOrder = {
-
-    "1": 0,
-
-    "2": 1,
-
-    "0": 2
-
-};
-
-const questions = Array.from(questionMap.values())
-
-    .sort((a, b) => {
-
-        return typeOrder[a.type] - typeOrder[b.type];
-
-    });
+    const questions = Array.from(questionMap.values())
+        .sort((a, b) => typeOrder[a.type] - typeOrder[b.type]);
 
     console.log(
-        "📊 原始题目数：" + allQuestions.length +
-        "，去重后：" + questions.length +
-        "，重复：" + duplicateCount +
-        "，疑似重复：" + fuzzyCount
+        '📊 原始题目：' + rawCount +
+        '，去重后：' + questions.length
     );
 
     if (questions.length > 0) {
-        let output = "📚 发现 " + questions.length + " 道题目\n";
-        output += "====================\n";
-
         const typeNames = {
-            "0": "判断题",
-            "1": "单选题",
-            "2": "多选题"
+            '1': '单选题',
+            '2': '多选题',
+            '0': '判断题'
         };
 
-        
-        // 各题型独立编号
-        const questionCounters = {
-            "1": 0, // 单选题
-            "2": 0, // 多选题
-            "0": 0  // 判断题
+        // 每种题型独立编号
+        const counters = {
+            '1': 0,
+            '2': 0,
+            '0': 0
         };
+
+        let output = '📚 发现 ' + questions.length + ' 道题目\n';
+        output += '====================\n';
 
         questions.forEach((q, index) => {
-            // 当前题型序号加1
-            questionCounters[q.type]++;
+            // 当前题型编号增加1
+            counters[q.type]++;
 
-            const questionNumber = questionCounters[q.type];
-
-            // 题型名称
-            const typeStr = typeNames[q.type] || "未知题型";
-
-            // 提取题目前15个字
-            let shortStem = q.stem;
-
-            if (shortStem.length > 15) {
-                shortStem = shortStem.substring(0, 15) + "…";
-            }
+            // 截取题目前15字
+            const shortStem = q.stem.length > 15
+                ? q.stem.slice(0, 15) + '…'
+                : q.stem;
 
             // 正确答案
-            const answerStr = Array.from(q.answers)
+            const answer = Array.from(q.answers)
                 .sort()
-                .join("") || "未找到答案";
+                .join('') || '未找到答案';
 
-            // 输出题型、序号、题干
-            output += `${typeStr}${questionNumber}：${shortStem}\n`;
-            output += `答案：${answerStr}\n`;
+            // 输出题型和序号
+            output += typeNames[q.type] +
+                counters[q.type] + '：' +
+                shortStem + '\n';
 
-            if (index < questions.length - 1) {
-                output += "----\n";
+            output += '答案：' + answer + '\n';
+
+            if (index !== questions.length - 1) {
+                output += '----\n';
             }
         });
 
-            let shortStem = q.stem;
-
-            if (shortStem.length > 15) {
-                shortStem = shortStem.substring(0, 15) + "…";
-            }
-
-            const answerStr = Array.from(q.answers)
-                .sort()
-                .join("") || "未找到答案";
-
-            output += typeNames[q.type] + "：" + shortStem + "\n";
-            output += "答案：" + answerStr + "\n";
-
-            if (index < questions.length - 1) {
-                output += "----\n";
-            }
-        });
-
-        output += "====================\n";
-        output += "问题反馈：687618";
+        output += '====================\n';
+        output += '问题反馈：687618';
 
         console.log(output);
 
         $notify(
-            "📖 题目解析完成 " + VERSION,
-            "共提取 " + questions.length + " 题",
+            '📖 题目解析完成 ' + VERSION,
+            '共提取 ' + questions.length + ' 题',
             output
         );
+
     } else {
-        console.log("⚠️ 未找到题目信息");
+        console.log('⚠️ 未找到题目信息');
     }
 
 } catch (e) {
-    console.log("❌ 解析失败：" + e.message);
-}
+    console.log('❌ 题目解析失败：' + e.message);
 
-$done({});
+} finally {
+    // 只执行一次
+    $done({});
+}
