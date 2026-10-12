@@ -144,7 +144,31 @@ try {
         }
     });
 
-    const questions = Array.from(questionMap.values());
+// 题型排序：单选题 → 多选题 → 判断题
+
+// 1 = 单选题
+
+// 2 = 多选题
+
+// 0 = 判断题
+
+const typeOrder = {
+
+    "1": 0,
+
+    "2": 1,
+
+    "0": 2
+
+};
+
+const questions = Array.from(questionMap.values())
+
+    .sort((a, b) => {
+
+        return typeOrder[a.type] - typeOrder[b.type];
+
+    });
 
     console.log(
         "📊 原始题目数：" + allQuestions.length +
