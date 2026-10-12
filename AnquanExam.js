@@ -2,8 +2,9 @@
 /*
 脚本功能：安全e家答题
 脚本作者：Phdxmy（687618）
-更新时间：2026年
-修复：题目重复显示、重复递归、重复调用
+版本：v3.0
+修复：单选题重复显示
+增加：版本标识、重复检测日志
 
 [rewrite_local]
 # >安全E家答题
@@ -13,32 +14,32 @@
 hostname = mobile.baowugroup.com
 */
 
-const body = $response.body;
+const VERSION = "v3.0";
+console.log("✅ 安全考试脚本版本：" + VERSION);
 
 try {
-    const jsonData = JSON.parse(body);
-    const questionMap = new Map();
+    const jsonData = JSON.parse($response.body);
     const visited = new Set();
+    const allQuestions = [];
+    const questionMap = new Map();
 
-    // 统一题干格式，消除不影响题意的格式差异
-    function normalizeStem(stem) {
-        return String(stem || '')
-            .replace(/<[^>]*>/g, '')
-            .replace(/&nbsp;/gi, ' ')
-            .replace(/\s+/g, '')
-            .replace(/[　\u200B-\u200D\uFEFF]/g, '')
+    function normalize(str) {
+        return String(str == null ? "" : str)
+            .replace(/<[^>]*>/g, "")
+            .replace(/&nbsp;/gi, " ")
+            .replace(/&amp;/gi, "&")
+            .replace(/[\s\u200B-\u200D\uFEFF]/g, "")
             .trim();
     }
 
-    // 解析题目
-    function parseExamData(data) {
-        if (!data || typeof data !== 'object') return;
+    function extract(data) {
+        if (!data || typeof data !== "object") return;
         if (visited.has(data)) return;
 
         visited.add(data);
 
         if (Array.isArray(data)) {
-            data.forEach(parseExamData);
+            data.forEach(extract);
             return;
         }
 
@@ -46,14 +47,11 @@ try {
 
         if (
             data.questionStem != null &&
-            ['0', '1', '2'].includes(type)
+            ["0", "1", "2"].includes(type)
         ) {
-            const stem = normalizeStem(data.questionStem);
+            const stem = normalize(data.questionStem);
 
             if (stem) {
-                // 核心修复：只根据题型和完整题干去重
-                const key = JSON.stringify([type, stem]);
-
                 const options = Array.isArray(data.questionsOptions)
                     ? data.questionsOptions
                     : [];
@@ -61,99 +59,145 @@ try {
                 const answers = options
                     .filter(opt =>
                         opt &&
-                        String(opt.ifReply) === '1' &&
+                        String(opt.ifReply) === "1" &&
                         opt.optionItem != null
                     )
                     .map(opt => String(opt.optionItem).trim())
                     .filter(Boolean);
 
-                if (!questionMap.has(key)) {
-                    questionMap.set(key, {
-                        stem: String(data.questionStem),
-                        type: type,
-                        no: data.questionsNo || '未知编号',
-                        answers: new Set(answers)
-                    });
-                } else {
-                    // 重复题目：合并正确答案
-                    const existing = questionMap.get(key);
+                allQuestions.push({
+                    stem: stem,
+                    type: type,
+                    answers: answers,
+                    no: data.questionsNo || ""
+                });
+            }
+        }
 
-                    answers.forEach(answer => {
-                        existing.answers.add(answer);
-                    });
+        Object.keys(data).forEach(key => {
+            if (data[key] && typeof data[key] === "object") {
+                extract(data[key]);
+            }
+        });
+    }
+
+    extract(jsonData);
+
+    let duplicateCount = 0;
+    let fuzzyCount = 0;
+
+    allQuestions.forEach(q => {
+        const fullKey = q.type + "|" + q.stem;
+
+        // 首先使用完整题干匹配
+        let key = fullKey;
+
+        if (!questionMap.has(key)) {
+            // 对仍未匹配的题目，检查是否为疑似重复
+            const candidates = Array.from(questionMap.entries());
+
+            for (const [oldKey, oldQ] of candidates) {
+                if (oldQ.type !== q.type) continue;
+
+                const samePrefix =
+                    q.stem.substring(0, 15) ===
+                    oldQ.stem.substring(0, 15);
+
+                const sameAnswer =
+                    [...q.answers].sort().join(",") ===
+                    [...oldQ.answers].sort().join(",");
+
+                // 仅在题型、前15字、正确答案均相同
+                // 时进行兜底去重
+                if (samePrefix && sameAnswer) {
+                    key = oldKey;
+
+                    if (q.stem !== oldQ.stem) {
+                        fuzzyCount++;
+
+                        console.log(
+                            "🔍 疑似重复题干差异：" +
+                            "\n第一题：" + oldQ.stem +
+                            "\n第二题：" + q.stem
+                        );
+                    }
+
+                    break;
                 }
             }
         }
 
-        // 只递归一次，避免重复扫描
-        Object.keys(data).forEach(key => {
-            const value = data[key];
+        if (questionMap.has(key)) {
+            duplicateCount++;
 
-            if (value && typeof value === 'object') {
-                parseExamData(value);
-            }
-        });
-    }
+            const existing = questionMap.get(key);
 
-    parseExamData(jsonData);
+            q.answers.forEach(answer => {
+                existing.answers.add(answer);
+            });
+        } else {
+            questionMap.set(key, {
+                stem: q.stem,
+                type: q.type,
+                answers: new Set(q.answers)
+            });
+        }
+    });
 
     const questions = Array.from(questionMap.values());
 
+    console.log(
+        "📊 原始题目数：" + allQuestions.length +
+        "，去重后：" + questions.length +
+        "，重复：" + duplicateCount +
+        "，疑似重复：" + fuzzyCount
+    );
+
     if (questions.length > 0) {
-        let output = `📚 发现 ${questions.length} 道题目\n`;
-        output += `====================\n`;
+        let output = "📚 发现 " + questions.length + " 道题目\n";
+        output += "====================\n";
 
         const typeNames = {
-            '0': '❄️判断题',
-            '1': '🔥单选题',
-            '2': '⭐️多选题'
+            "0": "❄️判断题",
+            "1": "🔥单选题",
+            "2": "⭐️多选题"
         };
 
         questions.forEach((q, index) => {
-            const typeStr = typeNames[q.type] || '未知题型';
-
-            let shortStem = q.stem
-                .replace(/<[^>]*>/g, '')
-                .replace(/\s+/g, ' ')
-                .trim();
+            let shortStem = q.stem;
 
             if (shortStem.length > 15) {
-                shortStem = shortStem.substring(0, 15) + '…';
+                shortStem = shortStem.substring(0, 15) + "…";
             }
 
-            let answerStr = Array.from(q.answers)
+            const answerStr = Array.from(q.answers)
                 .sort()
-                .join('');
+                .join("") || "未找到答案";
 
-            if (!answerStr) {
-                answerStr = '未找到答案';
-            }
-
-            output += `${typeStr}：${shortStem}\n`;
-            output += `答案：${answerStr}\n`;
+            output += typeNames[q.type] + "：" + shortStem + "\n";
+            output += "答案：" + answerStr + "\n";
 
             if (index < questions.length - 1) {
-                output += `----\n`;
+                output += "----\n";
             }
         });
 
-        output += `====================\n`;
-        output += `问题反馈：687618`;
+        output += "====================\n";
+        output += "问题反馈：687618";
 
         console.log(output);
 
         $notify(
-            '📖 题目解析完成',
-            `共提取 ${questions.length} 题`,
+            "📖 题目解析完成 " + VERSION,
+            "共提取 " + questions.length + " 题",
             output
         );
-
     } else {
-        console.log('⚠️ 未在响应数据中找到题目信息。');
+        console.log("⚠️ 未找到题目信息");
     }
 
-} catch (error) {
-    console.log('⚠️ 题目解析失败：' + error.message);
-} finally {
-    $done({});
+} catch (e) {
+    console.log("❌ 解析失败：" + e.message);
 }
+
+$done({});
