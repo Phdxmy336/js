@@ -182,9 +182,9 @@ const questions = Array.from(questionMap.values())
         output += "====================\n";
 
         const typeNames = {
-            "0": "❄️判断题",
-            "1": "🔥单选题",
-            "2": "⭐️多选题"
+            "0": "判断题",
+            "1": "单选题",
+            "2": "多选题"
         };
 
         questions.forEach((q, index) => {
